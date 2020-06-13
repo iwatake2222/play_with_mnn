@@ -126,3 +126,7 @@ make
 		- https://github.com/czy2014hust/posenet-python
 		- https://github.com/czy2014hust/posenet-python/blob/master/models/model-mobilenet_v1_075.pb?raw=true
 		- `MNNConvert.exe -f TF --modelFile posenet-mobilenet_v1_075.pb --MNNModel posenet-mobilenet_v1_075.mnn --bizCode biz`
+	- deeplabv3_257_mv_gpu.tflite
+		- https://www.tensorflow.org/lite/models/segmentation/overview
+		- https://storage.googleapis.com/download.tensorflow.org/models/tflite/gpu/deeplabv3_257_mv_gpu.tflite
+		- `MNNConvert.exe -f TFLITE --modelFile deeplabv3_257_mv_gpu.tflite --MNNModel deeplabv3_257_mv_gpu.mnn --bizCode biz`

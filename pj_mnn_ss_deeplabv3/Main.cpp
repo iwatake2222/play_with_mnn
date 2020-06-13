@@ -19,8 +19,8 @@
 
 /*** Macro ***/
 /* Model parameters */
-#define MODEL_NAME   RESOURCE_DIR"/model/mobilenet_v2_1.0_224.mnn"
-#define IMAGE_NAME   RESOURCE_DIR"/parrot.jpg"
+#define MODEL_NAME   RESOURCE_DIR"/model/deeplabv3_257_mv_gpu.mnn"
+#define IMAGE_NAME   RESOURCE_DIR"/cat.jpg"
 
 /* Settings */
 #define LOOP_NUM_FOR_TIME_MEASUREMENT 100
@@ -77,34 +77,39 @@ int main(int argc, const char* argv[])
 	/* Retreive results */
 	auto output = net->getSessionOutput(session, NULL);
 	auto dimType = output->getDimensionType();
+	dimType = MNN::Tensor::TENSORFLOW;
 
 	std::shared_ptr<MNN::Tensor> outputUser(new MNN::Tensor(output, dimType));
 	output->copyToHostTensor(outputUser.get());
-	auto size = outputUser->elementSize();
-	auto type = outputUser->getType();
-	printf("output size: size = %d\n", size);
-	
-	std::vector<std::pair<int, float>> tempValues(size);
-	if (type.code == halide_type_float) {
-		auto values = outputUser->host<float>();
-		for (int i = 0; i < size; ++i) {
-			tempValues[i] = std::make_pair(i, values[i]);
-		}
-	} else if (type.code == halide_type_uint && type.bytes() == 1) {
-		auto values = outputUser->host<uint8_t>();
-		for (int i = 0; i < size; ++i) {
-			tempValues[i] = std::make_pair(i, values[i]);
-		}
-	} else {
-		printf("should not reach here\n");
-	}
+	auto outputWidth = outputUser->shape()[2];
+	auto outputHeight = outputUser->shape()[1];
+	auto outputCannel = outputUser->shape()[3];
+	printf("output size: width = %d, height = %d, channel = %d\n", outputWidth, outputHeight, outputCannel);
 
-	/* Find the highest score */
-	std::sort(tempValues.begin(), tempValues.end(), [](std::pair<int, float> a, std::pair<int, float> b) { return a.second > b.second; });
-	int length = size > 10 ? 10 : size;
-	for (int i = 0; i < length; ++i) {
-		printf("%d: %f\n", tempValues[i].first, tempValues[i].second);
+	auto values = outputUser->host<float>();
+	cv::Mat outputImage = cv::Mat::zeros(outputHeight, outputWidth, CV_8UC3);
+	for (int y = 0; y < outputHeight; y++) {
+		for (int x = 0; x < outputWidth; x++) {
+			int maxChannel = 0;
+			float maxValue = 0;
+			for (int c = 0; c < outputCannel; c++) {
+				float value = values[y * (outputWidth * outputCannel) + x * outputCannel + c];
+				if (value > maxValue) {
+					maxValue = value;
+					maxChannel = c;
+				}
+			}
+
+			float colorRatio = (float)maxChannel / outputCannel;	// 0 ~ 1.0
+			outputImage.data[(y * outputWidth + x) * 3 + 0] = 0xFF * colorRatio;
+			outputImage.data[(y * outputWidth + x) * 3 + 1] = 0xFF * (0.5 + colorRatio/2);
+			outputImage.data[(y * outputWidth + x) * 3 + 2] = 0xFF * (1 - colorRatio);
+
+		}
 	}
+	cv::imshow("originalImage", originalImage); cv::waitKey(1);
+	cv::imshow("outputImage", outputImage); cv::waitKey(1);
+	cv::waitKey(-1);
 
 
 	/*** (Optional) Measure inference time ***/
