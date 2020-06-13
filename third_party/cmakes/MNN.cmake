@@ -1,5 +1,4 @@
 set(MNN_DIR ${CMAKE_SOURCE_DIR}/../third_party/MNN)
-target_include_directories(${PROJECT_NAME} PUBLIC ${MNN_DIR})
 target_include_directories(${PROJECT_NAME} PUBLIC ${MNN_DIR}/include)
 target_include_directories(${PROJECT_NAME} PUBLIC ${MNN_DIR}/3rd_party/imageHelper)
 
@@ -23,10 +22,10 @@ if(USE_PREBUILT_MNN)
 		endif()
 	else()
 		target_link_libraries(${ProjectName}
-			# $<$<STREQUAL:${BUILD_SYSTEM},x64_windows>:${CMAKE_SOURCE_DIR}/../third_party/ncnn_prebuilt/x64_windows/lib/ncnn.lib>
-			$<$<STREQUAL:${BUILD_SYSTEM},x64_linux>:${CMAKE_SOURCE_DIR}/../third_party/ncnn_prebuilt/x64_linux/lib/libncnn.a>
-			$<$<STREQUAL:${BUILD_SYSTEM},armv7>:${CMAKE_SOURCE_DIR}/../third_party/ncnn_prebuilt/armv7/lib/libncnn.a>
-			$<$<STREQUAL:${BUILD_SYSTEM},aarch64>:${CMAKE_SOURCE_DIR}/../third_party/ncnn_prebuilt/aarch64/lib/libncnn.a>
+			# $<$<STREQUAL:${BUILD_SYSTEM},x64_windows>:${CMAKE_SOURCE_DIR}/../third_party/MNN_prebuilt/x64_windows/lib/ncnn.lib>
+			$<$<STREQUAL:${BUILD_SYSTEM},x64_linux>:${CMAKE_SOURCE_DIR}/../third_party/MNN_prebuilt/x64_linux/libMNN.so>
+			$<$<STREQUAL:${BUILD_SYSTEM},armv7>:${CMAKE_SOURCE_DIR}/../third_party/MNN_prebuilt/armv7/libMNN.so>
+			$<$<STREQUAL:${BUILD_SYSTEM},aarch64>:${CMAKE_SOURCE_DIR}/../third_party/MNN_prebuilt/aarch64/libMNN.so>
 		)
 	endif()
 else()
