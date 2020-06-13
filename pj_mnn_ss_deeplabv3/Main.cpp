@@ -100,10 +100,12 @@ int main(int argc, const char* argv[])
 				}
 			}
 
-			float colorRatio = (float)maxChannel / outputCannel;	// 0 ~ 1.0
-			outputImage.data[(y * outputWidth + x) * 3 + 0] = 0xFF * colorRatio;
-			outputImage.data[(y * outputWidth + x) * 3 + 1] = 0xFF * (0.5 + colorRatio/2);
-			outputImage.data[(y * outputWidth + x) * 3 + 2] = 0xFF * (1 - colorRatio);
+			float colorRatioB = (maxChannel % 2 + 1) / 2.0;
+			float colorRatioG = (maxChannel % 3 + 1) / 3.0;
+			float colorRatioR = (maxChannel % 4 + 1) / 4.0;
+			outputImage.data[(y * outputWidth + x) * 3 + 0] = (int)(255 * colorRatioB);
+			outputImage.data[(y * outputWidth + x) * 3 + 1] = (int)(255 * colorRatioG);
+			outputImage.data[(y * outputWidth + x) * 3 + 2] = (int)(255 * (1 - colorRatioR));
 
 		}
 	}
