@@ -295,12 +295,14 @@ int main(int argc, const char* argv[])
 	auto session = net->createSession(scheduleConfig);
 
 	/* initialize camera */
-	int imageWidth = 640;
-	int imageHeight = 480;
+	int originalImageWidth = 640;
+	int originalImageHeight = 480;
+	int imageWidth = 225;
+	int imageHeight = 225;
 	static cv::VideoCapture cap;
 	cap = cv::VideoCapture(0);
-	cap.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-	cap.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+	cap.set(cv::CAP_PROP_FRAME_WIDTH, originalImageWidth);
+	cap.set(cv::CAP_PROP_FRAME_HEIGHT, originalImageHeight);
 	// cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('B', 'G', 'R', '3'));
 	cap.set(cv::CAP_PROP_BUFFERSIZE, 1);
 
@@ -316,8 +318,8 @@ int main(int argc, const char* argv[])
 	printf("model input size: widgh = %d , height = %d, channel = %d\n", modelWidth, modelHeight, modelChannel);
 
 	MNN::CV::Point scale;
-	scale.fX = (float)imageWidth / (float)targetWidth;
-	scale.fY = (float)imageHeight / (float)targetHeight;
+	scale.fX = (float)originalImageWidth / (float)targetWidth;
+	scale.fY = (float)originalImageHeight / (float)targetHeight;
 
 	/***** Process for each frame *****/
 	while (1) {
@@ -342,11 +344,11 @@ int main(int argc, const char* argv[])
 
 		MNN::CV::Matrix trans;
 		trans.postScale(1.0 / targetWidth, 1.0 / targetHeight);
-		trans.postScale(imageWidth, imageHeight);
+		trans.postScale(originalImageWidth, originalImageHeight);
 
 		std::shared_ptr<MNN::CV::ImageProcess> pretreat(MNN::CV::ImageProcess::create(imageProcessconfig));
 		pretreat->setMatrix(trans);
-		pretreat->convert((uint8_t*)originalImage.data, imageWidth, imageHeight, 0, input);
+		pretreat->convert((uint8_t*)originalImage.data, originalImageWidth, originalImageHeight, 0, input);
 		const auto& timePre1 = std::chrono::steady_clock::now();
 
 		/*** Inference ***/
@@ -385,7 +387,7 @@ int main(int argc, const char* argv[])
 				for (int id = 0; id < NUM_KEYPOINTS; ++id) {
 					if (poseKeypointScores[i][id] > SCORE_THRESHOLD) {
 						CV::Point point = poseKeypointCoords[i][id];
-						cv::circle(originalImage, cv::Point(point.fX, point.fY), 5, cv::Scalar(255, 0, 0), -1);
+						cv::circle(originalImage, cv::Point(point.fX, point.fY), 10, cv::Scalar(0, 255, 0), -1);
 					}
 				}
 			}
