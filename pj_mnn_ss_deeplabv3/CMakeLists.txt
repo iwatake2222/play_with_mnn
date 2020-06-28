@@ -40,12 +40,14 @@ add_executable(${ProjectName} Main.cpp)
 
 # For MNN
 include(${CMAKE_SOURCE_DIR}/../third_party/cmakes/MNN.cmake)
+target_include_directories(${ProjectName} PUBLIC ${MNN_INC})
+target_link_libraries(${ProjectName}  ${MNN_LIB})
 
 # For OpenCV
 find_package(OpenCV REQUIRED)
 if(OpenCV_FOUND)
-	target_include_directories(${PROJECT_NAME} PUBLIC ${OpenCV_INCLUDE_DIRS})
-	target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
+	target_include_directories(${ProjectName} PUBLIC ${OpenCV_INCLUDE_DIRS})
+	target_link_libraries(${ProjectName} ${OpenCV_LIBS})
 endif()
 
 # For OpenMP
