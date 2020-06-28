@@ -21,10 +21,10 @@ if(USE_PREBUILT_MNN)
 		endif()
 	else()
 		set(MNN_LIB
-			# $<$<STREQUAL:${BUILD_SYSTEM},x64_windows>:${CMAKE_SOURCE_DIR}/../third_party/MNN_prebuilt/x64_windows/lib/ncnn.lib>
-			$<$<STREQUAL:${BUILD_SYSTEM},x64_linux>:${CMAKE_SOURCE_DIR}/../third_party/MNN_prebuilt/x64_linux/libMNN.so>
-			$<$<STREQUAL:${BUILD_SYSTEM},armv7>:${CMAKE_SOURCE_DIR}/../third_party/MNN_prebuilt/armv7/libMNN.so>
-			$<$<STREQUAL:${BUILD_SYSTEM},aarch64>:${CMAKE_SOURCE_DIR}/../third_party/MNN_prebuilt/aarch64/libMNN.so>
+			# $<$<STREQUAL:${BUILD_SYSTEM},x64_windows>:${CMAKE_CURRENT_LIST_DIR}/../MNN_prebuilt/x64_windows/lib/ncnn.lib>
+			$<$<STREQUAL:${BUILD_SYSTEM},x64_linux>:${CMAKE_CURRENT_LIST_DIR}/../MNN_prebuilt/x64_linux/libMNN.so>
+			$<$<STREQUAL:${BUILD_SYSTEM},armv7>:${CMAKE_CURRENT_LIST_DIR}/../MNN_prebuilt/armv7/libMNN.so>
+			$<$<STREQUAL:${BUILD_SYSTEM},aarch64>:${CMAKE_CURRENT_LIST_DIR}/../MNN_prebuilt/aarch64/libMNN.so>
 		)
 	endif()
 else()
