@@ -1,4 +1,4 @@
-set(MNN_DIR ${CMAKE_SOURCE_DIR}/../third_party/MNN)
+set(MNN_DIR ${CMAKE_CURRENT_LIST_DIR}/../MNN)
 set(MNN_INC ${MNN_DIR}/include)
 
 set(USE_PREBUILT_MNN on CACHE BOOL "Use Prebuilt MNN? [on/off]")
