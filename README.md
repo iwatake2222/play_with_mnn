@@ -43,6 +43,18 @@ make
 ./main
 ```
 
+### Android
+Follow the instruction (https://www.yuque.com/mnn/en/build_android ).
+
+```
+export ANDROID_NDK=/path/to/android-ndk
+cd /path/to/MNN
+./schema/generate.sh
+cd project/android
+mkdir build_32 && cd build_32 && ../build_32.sh
+mkdir build_64 && cd build_64 && ../build_64.sh
+```
+
 ### Windows (Visual Studio)
 - Build `third_party\MNN\3rd_party\flatbuffers` in Visual Studio (use cmake-gui)
 - Copy flatc.exe to any place (Prebuilt executable file is stored in `play_with_mnn\third_party\MNN_prebuilt\tools\x64_windows\flatc.exe`

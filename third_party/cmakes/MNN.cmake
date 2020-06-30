@@ -1,9 +1,28 @@
 set(MNN_DIR ${CMAKE_CURRENT_LIST_DIR}/../MNN)
 set(MNN_INC ${MNN_DIR}/include)
 
+
 set(USE_PREBUILT_MNN on CACHE BOOL "Use Prebuilt MNN? [on/off]")
 if(USE_PREBUILT_MNN)
-	if(MSVC_VERSION)
+	if(${ANDROID_ABI} STREQUAL "armeabi-v7a")
+		# set(MNN_LIB ${CMAKE_CURRENT_LIST_DIR}/../MNN_prebuilt/android/${ANDROID_ABI}/libMNN.so)
+		add_library( MNN SHARED IMPORTED GLOBAL )
+		set_target_properties(
+			MNN
+			PROPERTIES IMPORTED_LOCATION
+			${CMAKE_CURRENT_LIST_DIR}/../MNN_prebuilt/android/${ANDROID_ABI}/libMNN.so
+			)
+			set(MNN_LIB MNN)
+	elseif(${ANDROID_ABI} STREQUAL "arm64-v8a")
+		# set(MNN_LIB ${CMAKE_CURRENT_LIST_DIR}/../MNN_prebuilt/android/${ANDROID_ABI}/libMNN.so)
+		add_library( MNN SHARED IMPORTED GLOBAL )
+		set_target_properties(
+			MNN
+			PROPERTIES IMPORTED_LOCATION
+			${CMAKE_CURRENT_LIST_DIR}/../MNN_prebuilt/android/${ANDROID_ABI}/libMNN.so
+			)
+		set(MNN_LIB MNN)
+	elseif(MSVC_VERSION)
 		file(COPY ${CMAKE_CURRENT_LIST_DIR}/../MNN_prebuilt/x64_windows/VS2017/Debug/MNN.dll DESTINATION ${CMAKE_BINARY_DIR}/Debug)
 		file(COPY ${CMAKE_CURRENT_LIST_DIR}/../MNN_prebuilt/x64_windows/VS2017/RelWithDebInfo/MNN.dll DESTINATION ${CMAKE_BINARY_DIR}/RelWithDebInfo)
 		file(COPY ${CMAKE_CURRENT_LIST_DIR}/../MNN_prebuilt/x64_windows/VS2017/Release/MNN.dll DESTINATION ${CMAKE_BINARY_DIR}/Release)
