@@ -7,6 +7,8 @@ cmake_minimum_required(VERSION 3.4.1)
 
 #↓↓↓ 追加 ↓↓↓
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/jniLibs/${ANDROID_ABI})
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 ")
 #↑↑↑ 追加 ↑↑↑
 
 # Creates and names a library, sets it as either STATIC

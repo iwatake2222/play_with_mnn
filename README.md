@@ -23,7 +23,24 @@ make
 ./main
 ```
 
+### Visual Studio
 If you use Visual Studio, please use cmake-gui to generate project files.
+
+### Android project
+If you want to run Android project, please select `ViewAndroid` directory in Android Studio.
+
+You will need the following settings at first.
+
+- Configure NDK
+	- File -> Project Structure -> SDK Location -> Android NDK location
+		- C:\Users\abc\AppData\Local\Android\Sdk\ndk\21.3.6528147
+- Import OpenCV
+	- Download and extract OpenCV android-sdk (https://github.com/opencv/opencv/releases )
+	- File -> New -> Import Module
+		- path-to-opencv\opencv-4.3.0-android-sdk\OpenCV-android-sdk\sdk
+	- FIle -> Project Structure -> Dependencies -> app -> Declared Dependencies -> + -> Module Dependencies
+		- select `sdk`
+	- In case you cannot import OpenCV module, remove `sdk` module and dependency of `app` to `sdk` in Project Structure
 
 ## How to create pre-built MNN library
 pre-built MNN library is stored in third_party/MNN_prebuilt . Please use the following commands if you want to build them by yourself.
