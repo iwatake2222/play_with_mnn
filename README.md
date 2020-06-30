@@ -1,4 +1,6 @@
 # Play with MNN
+![00_doc/demo_multi.gif](00_doc/demo_multi.gif)
+
 Sample projects to use MNN (https://github.com/alibaba/MNN )
 
 ## Target environment
