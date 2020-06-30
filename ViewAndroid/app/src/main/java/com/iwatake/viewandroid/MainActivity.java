@@ -51,7 +51,7 @@ public class MainActivity extends AppCompatActivity {
 
     /*** For CameraX ***/
     private Camera camera = null;
-    private Preview preview = null;
+//    private Preview preview = null;       // do not use preview (doesn't change performance, thought)
     private ImageAnalysis imageAnalysis = null;
     private ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
 
@@ -59,6 +59,7 @@ public class MainActivity extends AppCompatActivity {
     static {
         System.loadLibrary("opencv_java4");
         System.loadLibrary("native-lib");
+        System.loadLibrary("MNN");
     }
 
     @Override
@@ -69,9 +70,8 @@ public class MainActivity extends AppCompatActivity {
         previewView = findViewById(R.id.previewView);
         imageView = findViewById(R.id.imageView);
 
-        ImageProcessorInitialize();
-
         if (checkPermissions()) {
+            ImageProcessorInitialize();
             startCamera();
         } else {
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_FOR_PERMISSIONS);
@@ -92,14 +92,15 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 try {
                     ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
-                    preview = new Preview.Builder().build();
+//                    preview = new Preview.Builder().build();
                     imageAnalysis = new ImageAnalysis.Builder().build();
                     imageAnalysis.setAnalyzer(cameraExecutor, new MyImageAnalyzer());
                     CameraSelector cameraSelector = new CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_BACK).build();
 
                     cameraProvider.unbindAll();
-                    camera = cameraProvider.bindToLifecycle((LifecycleOwner)context, cameraSelector, preview, imageAnalysis);
-                    preview.setSurfaceProvider(previewView.createSurfaceProvider(camera.getCameraInfo()));
+//                    camera = cameraProvider.bindToLifecycle((LifecycleOwner)context, cameraSelector, preview, imageAnalysis);
+                    camera = cameraProvider.bindToLifecycle((LifecycleOwner)context, cameraSelector,  imageAnalysis);
+//                    preview.setSurfaceProvider(previewView.createSurfaceProvider(camera.getCameraInfo()));
                 } catch(Exception e) {
                     Log.e(TAG, "[startCamera] Use case binding failed", e);
                 }
@@ -131,10 +132,6 @@ public class MainActivity extends AppCompatActivity {
 //            Core.absdiff(mat, matPrevious, matOutput);
 //            matPrevious = mat;
 
-            /* Draw something for test */
-            Imgproc.rectangle(matOutput, new Rect(10, 10, 100, 100), new Scalar(255, 0, 0));
-            Imgproc.putText(matOutput, "leftTop", new Point(10, 10), 1, 1, new Scalar(255, 0, 0));
-
             /* Draw FPS */
             long currentTime = System.nanoTime();
             float fps = 1000000000 / (currentTime - previousTime);
@@ -143,7 +140,7 @@ public class MainActivity extends AppCompatActivity {
             averageFPS = (averageFPS * (frameCount - 1) + fps) / frameCount;
             Formatter fm = new Formatter();
             fm.format("%4.1f FPS (%4.1f FPS)", averageFPS, fps);
-            Imgproc.putText(matOutput,  fm.toString(), new Point(10, 10), 1, 1, new Scalar(255, 0, 0));
+            Imgproc.putText(matOutput,  fm.toString(), new Point(10, 50), 1, 2, new Scalar(0, 255, 0));
 
             /* Convert cv::mat to bitmap for drawing */
             Bitmap bitmap = Bitmap.createBitmap(matOutput.cols(), matOutput.rows(),Bitmap.Config.ARGB_8888);
@@ -215,6 +212,7 @@ public class MainActivity extends AppCompatActivity {
 //        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if(requestCode == REQUEST_CODE_FOR_PERMISSIONS){
             if(checkPermissions()){
+                ImageProcessorInitialize();
                 startCamera();
             } else{
                 Log.i(TAG, "[onRequestPermissionsResult] Failed to get permissions");
