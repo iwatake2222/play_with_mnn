@@ -5,6 +5,10 @@
 
 cmake_minimum_required(VERSION 3.4.1)
 
+#↓↓↓ 追加 ↓↓↓
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/jniLibs/${ANDROID_ABI})
+#↑↑↑ 追加 ↑↑↑
+
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
 # You can define multiple libraries, and CMake builds them for you.
@@ -42,3 +46,19 @@ target_link_libraries( # Specifies the target library.
                        # Links the target library to the log library
                        # included in the NDK.
                        ${log-lib} )
+
+# ↓↓↓ 追加 ↓↓↓
+### For OpenCV
+#set(OpenCV_DIR "D:/devel/opencv-4.3.0-android-sdk/OpenCV-android-sdk/sdk/native/jni")
+set(OpenCV_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../../sdk/native/jni")
+find_package(OpenCV REQUIRED)
+target_include_directories(native-lib PUBLIC ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(native-lib ${OpenCV_LIBS})
+
+### For my module
+set(ImageProcessor_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../../../pj_mnn_posenet_mobilenet_v1/ImageProcessor")
+message(${ImageProcessor_DIR})
+add_subdirectory(${ImageProcessor_DIR} ImageProcessor)
+target_include_directories(native-lib PUBLIC ${ImageProcessor_DIR})
+target_link_libraries(native-lib ImageProcessor)
+# ↑↑↑ 追加 ↑↑↑

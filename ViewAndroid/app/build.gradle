@@ -12,11 +12,14 @@ android {
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+//        ↓↓↓ 追加 ↓↓↓  https://github.com/alibaba/MNN/blob/master/project/android/build.gradle
         externalNativeBuild {
             cmake {
-                cppFlags ""
+                arguments "-DANDROID_ARM_NEON=TRUE", "-DANDROID_PLATFORM=android-21", "-DMNN_OPENCL=true", "-DANDROID_STL=c++_shared"
+                abiFilters 'armeabi-v7a', 'arm64-v8a'
             }
         }
+//        ↑↑↑ 追加 ↑↑↑
     }
 
     buildTypes {

@@ -35,6 +35,7 @@ import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
 import java.nio.ByteBuffer;
+import java.util.Formatter;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -68,11 +69,19 @@ public class MainActivity extends AppCompatActivity {
         previewView = findViewById(R.id.previewView);
         imageView = findViewById(R.id.imageView);
 
+        ImageProcessorInitialize();
+
         if (checkPermissions()) {
             startCamera();
         } else {
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_FOR_PERMISSIONS);
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        ImageProcessorFinalize();
     }
 
     private void startCamera() {
@@ -99,7 +108,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private class MyImageAnalyzer implements ImageAnalysis.Analyzer {
-        private Mat matPrevious = null;
+        private long previousTime = System.nanoTime();
+        private float averageFPS = 0;
+        private int frameCount = 0;
 
         @Override
         public void analyze(@NonNull ImageProxy image) {
@@ -113,14 +124,26 @@ public class MainActivity extends AppCompatActivity {
             Log.i(TAG, "[analyze] mat width = " + matOrg.cols() + ", mat height = " + matOrg.rows());
 
             /* Do some image processing */
-            Mat matOutput = new Mat(mat.rows(), mat.cols(), mat.type());
-            if (matPrevious == null) matPrevious = mat;
-            Core.absdiff(mat, matPrevious, matOutput);
-            matPrevious = mat;
+            ImageProcessorProcess(mat.getNativeObjAddr());
+            Mat matOutput = mat;
+//            Mat matOutput = new Mat(mat.rows(), mat.cols(), mat.type());
+//            if (matPrevious == null) matPrevious = mat;
+//            Core.absdiff(mat, matPrevious, matOutput);
+//            matPrevious = mat;
 
             /* Draw something for test */
             Imgproc.rectangle(matOutput, new Rect(10, 10, 100, 100), new Scalar(255, 0, 0));
             Imgproc.putText(matOutput, "leftTop", new Point(10, 10), 1, 1, new Scalar(255, 0, 0));
+
+            /* Draw FPS */
+            long currentTime = System.nanoTime();
+            float fps = 1000000000 / (currentTime - previousTime);
+            previousTime = currentTime;
+            frameCount++;
+            averageFPS = (averageFPS * (frameCount - 1) + fps) / frameCount;
+            Formatter fm = new Formatter();
+            fm.format("%4.1f FPS (%4.1f FPS)", averageFPS, fps);
+            Imgproc.putText(matOutput,  fm.toString(), new Point(10, 10), 1, 1, new Scalar(255, 0, 0));
 
             /* Convert cv::mat to bitmap for drawing */
             Bitmap bitmap = Bitmap.createBitmap(matOutput.cols(), matOutput.rows(),Bitmap.Config.ARGB_8888);
@@ -204,5 +227,7 @@ public class MainActivity extends AppCompatActivity {
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
      */
-    public native String stringFromJNI();
+    public native int ImageProcessorInitialize();
+    public native int ImageProcessorProcess(long objMat);
+    public native int ImageProcessorFinalize();
 }
