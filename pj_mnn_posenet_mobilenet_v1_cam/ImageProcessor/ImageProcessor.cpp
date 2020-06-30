@@ -18,6 +18,16 @@
 #include <MNN/AutoTime.hpp>
 
 /*** Macro ***/
+/*** Macro ***/
+#if defined(ANDROID) || defined(__ANDROID__)
+#include <android/log.h>
+#define TAG "MyApp_NDK"
+#define PRINT(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
+#else
+#define PRINT(...) printf(__VA_ARGS__)
+#endif
+
+
 /*** [Start] Retrieved from demo source code in MNN (multiPose.cpp/.h) ***/
 using namespace MNN;
 /* Settings */
@@ -298,7 +308,7 @@ int ImageProcessor_process(cv::Mat *mat)
 {
 	cv::Mat originalImage = *mat;
 
-	/* Get model information */
+	/* Fix model input size */
 	int imageWidth = 225;
 	int imageHeight = 225;
 	auto input = net->getSessionInput(session, NULL);
@@ -309,14 +319,13 @@ int ImageProcessor_process(cv::Mat *mat)
 	int modelChannel = input->channel();
 	int modelHeight = input->height();
 	int modelWidth = input->width();
-	printf("model input size: widgh = %d , height = %d, channel = %d\n", modelWidth, modelHeight, modelChannel);
+	//PRINT("model input size: widgh = %d , height = %d, channel = %d\n", modelWidth, modelHeight, modelChannel);
 
 	int originalImageWidth = originalImage.cols;
 	int originalImageHeight = originalImage.cols;
 	MNN::CV::Point scale;
 	scale.fX = (float)originalImageWidth / (float)targetWidth;
 	scale.fY = (float)originalImageHeight / (float)targetHeight;
-
 
 	/*** Pre process (resize, colorconversion, normalize) ***/
 	const auto& timePre0 = std::chrono::steady_clock::now();

@@ -18,9 +18,15 @@
 #include <MNN/AutoTime.hpp>
 
 /*** Macro ***/
-/* Model parameters */
-#define MODEL_NAME   RESOURCE_DIR"/model/posenet-mobilenet_v1_075.mnn"
-#define IMAGE_NAME   RESOURCE_DIR"/ZOM93_minatomirainodate20140503_TP_V4.jpg"
+/*** Macro ***/
+#if defined(ANDROID) || defined(__ANDROID__)
+#include <android/log.h>
+#define TAG "MyApp_NDK"
+#define PRINT(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
+#else
+#define PRINT(...) printf(__VA_ARGS__)
+#endif
+
 
 /*** [Start] Retrieved from demo source code in MNN (multiPose.cpp/.h) ***/
 using namespace MNN;
@@ -280,133 +286,116 @@ static int decodeMultiPose(const Tensor* offsets, const Tensor* displacementFwd,
 }
 
 /*** [End] Retrieved from demo source code in MNN (multiPose.cpp/.h) ***/
-
-int main(int argc, const char* argv[])
+static MNN::Interpreter *net;
+static Session* session;
+int ImageProcessor_initialize(const char *modelFilename)
 {
-	/*** Initialize ***/
 	/* Create interpreter */
-	std::shared_ptr<MNN::Interpreter> net(MNN::Interpreter::createFromFile(MODEL_NAME));
+	net = MNN::Interpreter::createFromFile(modelFilename);
 	MNN::ScheduleConfig scheduleConfig;
 	scheduleConfig.type  = MNN_FORWARD_AUTO;
 	scheduleConfig.numThread = 4;
 	// BackendConfig bnconfig;
 	// bnconfig.precision = BackendConfig::Precision_Low;
 	// config.backendConfig = &bnconfig;
-	auto session = net->createSession(scheduleConfig);
+	session = net->createSession(scheduleConfig);
 
-	/* initialize camera */
-	int originalImageWidth = 640;
-	int originalImageHeight = 480;
+
+	return 0;
+}
+
+int ImageProcessor_process(cv::Mat *mat)
+{
+	cv::Mat originalImage = *mat;
+
+	/* Fix model input size */
 	int imageWidth = 225;
 	int imageHeight = 225;
-	static cv::VideoCapture cap;
-	cap = cv::VideoCapture(0);
-	cap.set(cv::CAP_PROP_FRAME_WIDTH, originalImageWidth);
-	cap.set(cv::CAP_PROP_FRAME_HEIGHT, originalImageHeight);
-	// cap.set(cv::CAP_PROP_FOURCC, cv::VideoWriter::fourcc('B', 'G', 'R', '3'));
-	cap.set(cv::CAP_PROP_BUFFERSIZE, 1);
-
-	/* Get model information */
 	auto input = net->getSessionInput(session, NULL);
-	const int targetWidth = static_cast<int>((float)imageWidth / (float)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1;
-	const int targetHeight = static_cast<int>((float)imageHeight / (float)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1;
+	static int targetWidth = static_cast<int>((float)imageWidth / (float)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1;
+	static int targetHeight = static_cast<int>((float)imageHeight / (float)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1;
 	net->resizeTensor(input, { 1, 3, targetHeight, targetWidth });
 	net->resizeSession(session);
 	int modelChannel = input->channel();
-	int modelHeight  = input->height();
-	int modelWidth   = input->width();
-	printf("model input size: widgh = %d , height = %d, channel = %d\n", modelWidth, modelHeight, modelChannel);
+	int modelHeight = input->height();
+	int modelWidth = input->width();
+	//PRINT("model input size: widgh = %d , height = %d, channel = %d\n", modelWidth, modelHeight, modelChannel);
 
+	int originalImageWidth = originalImage.cols;
+	int originalImageHeight = originalImage.cols;
 	MNN::CV::Point scale;
 	scale.fX = (float)originalImageWidth / (float)targetWidth;
 	scale.fY = (float)originalImageHeight / (float)targetHeight;
 
-	/***** Process for each frame *****/
-	while (1) {
-		const auto& timeAll0 = std::chrono::steady_clock::now();
-		/*** Read image ***/
-		const auto& timeCap0 = std::chrono::steady_clock::now();
-		//cv::Mat originalImage = cv::imread(IMAGE_NAME);
-		cv::Mat originalImage;
-		cap.read(originalImage);
-		const auto& timeCap1 = std::chrono::steady_clock::now();
+	/*** Pre process (resize, colorconversion, normalize) ***/
+	const auto& timePre0 = std::chrono::steady_clock::now();
+	MNN::CV::ImageProcess::Config imageProcessconfig;
+	imageProcessconfig.filterType = MNN::CV::BILINEAR;
+	float mean[3] = { 127.5f, 127.5f, 127.5f };
+	float normals[3] = { 0.00785f, 0.00785f, 0.00785f };
+	std::memcpy(imageProcessconfig.mean, mean, sizeof(mean));
+	std::memcpy(imageProcessconfig.normal, normals, sizeof(normals));
+	imageProcessconfig.sourceFormat = MNN::CV::BGR;
+	imageProcessconfig.destFormat = MNN::CV::BGR;
 
-		/*** Pre process (resize, colorconversion, normalize) ***/
-		const auto& timePre0 = std::chrono::steady_clock::now();
-		MNN::CV::ImageProcess::Config imageProcessconfig;
-		imageProcessconfig.filterType = MNN::CV::BILINEAR;
-		float mean[3] = { 127.5f, 127.5f, 127.5f };
-		float normals[3] = { 0.00785f, 0.00785f, 0.00785f };
-		std::memcpy(imageProcessconfig.mean, mean, sizeof(mean));
-		std::memcpy(imageProcessconfig.normal, normals, sizeof(normals));
-		imageProcessconfig.sourceFormat = MNN::CV::BGR;
-		imageProcessconfig.destFormat = MNN::CV::BGR;
+	MNN::CV::Matrix trans;
+	trans.postScale(1.0 / targetWidth, 1.0 / targetHeight);
+	trans.postScale(originalImageWidth, originalImageHeight);
 
-		MNN::CV::Matrix trans;
-		trans.postScale(1.0 / targetWidth, 1.0 / targetHeight);
-		trans.postScale(originalImageWidth, originalImageHeight);
+	std::shared_ptr<MNN::CV::ImageProcess> pretreat(MNN::CV::ImageProcess::create(imageProcessconfig));
+	pretreat->setMatrix(trans);
+	pretreat->convert((uint8_t*)originalImage.data, originalImageWidth, originalImageHeight, 0, input);
+	const auto& timePre1 = std::chrono::steady_clock::now();
 
-		std::shared_ptr<MNN::CV::ImageProcess> pretreat(MNN::CV::ImageProcess::create(imageProcessconfig));
-		pretreat->setMatrix(trans);
-		pretreat->convert((uint8_t*)originalImage.data, originalImageWidth, originalImageHeight, 0, input);
-		const auto& timePre1 = std::chrono::steady_clock::now();
+	/*** Inference ***/
+	const auto& timeInference0 = std::chrono::steady_clock::now();
+	net->runSession(session);
+	const auto& timeInference1 = std::chrono::steady_clock::now();
 
-		/*** Inference ***/
-		const auto& timeInference0 = std::chrono::steady_clock::now();
-		net->runSession(session);
-		const auto& timeInference1 = std::chrono::steady_clock::now();
+	/*** Post process ***/
+	/* Retreive results */
+	const auto& timePost0 = std::chrono::steady_clock::now();
+	auto offsets = net->getSessionOutput(session, OFFSET_NODE_NAME);
+	auto displacementFwd = net->getSessionOutput(session, DISPLACE_FWD_NODE_NAME);
+	auto displacementBwd = net->getSessionOutput(session, DISPLACE_BWD_NODE_NAME);
+	auto heatmaps = net->getSessionOutput(session, HEATMAPS);
 
-		/*** Post process ***/
-		/* Retreive results */
-		const auto& timePost0 = std::chrono::steady_clock::now();
-		auto offsets = net->getSessionOutput(session, OFFSET_NODE_NAME);
-		auto displacementFwd = net->getSessionOutput(session, DISPLACE_FWD_NODE_NAME);
-		auto displacementBwd = net->getSessionOutput(session, DISPLACE_BWD_NODE_NAME);
-		auto heatmaps = net->getSessionOutput(session, HEATMAPS);
+	MNN::Tensor offsetsHost(offsets, MNN::Tensor::CAFFE);
+	MNN::Tensor displacementFwdHost(displacementFwd, MNN::Tensor::CAFFE);
+	MNN::Tensor displacementBwdHost(displacementBwd, MNN::Tensor::CAFFE);
+	MNN::Tensor heatmapsHost(heatmaps, MNN::Tensor::CAFFE);
 
-		MNN::Tensor offsetsHost(offsets, MNN::Tensor::CAFFE);
-		MNN::Tensor displacementFwdHost(displacementFwd, MNN::Tensor::CAFFE);
-		MNN::Tensor displacementBwdHost(displacementBwd, MNN::Tensor::CAFFE);
-		MNN::Tensor heatmapsHost(heatmaps, MNN::Tensor::CAFFE);
+	offsets->copyToHostTensor(&offsetsHost);
+	displacementFwd->copyToHostTensor(&displacementFwdHost);
+	displacementBwd->copyToHostTensor(&displacementBwdHost);
+	heatmaps->copyToHostTensor(&heatmapsHost);
 
-		offsets->copyToHostTensor(&offsetsHost);
-		displacementFwd->copyToHostTensor(&displacementFwdHost);
-		displacementBwd->copyToHostTensor(&displacementBwdHost);
-		heatmaps->copyToHostTensor(&heatmapsHost);
+	std::vector<float> poseScores;
+	std::vector<std::vector<float>> poseKeypointScores;
+	std::vector<std::vector<MNN::CV::Point>> poseKeypointCoords;
 
-		std::vector<float> poseScores;
-		std::vector<std::vector<float>> poseKeypointScores;
-		std::vector<std::vector<MNN::CV::Point>> poseKeypointCoords;
+	decodeMultiPose(&offsetsHost, &displacementFwdHost, &displacementBwdHost, &heatmapsHost, poseScores,
+		poseKeypointScores, poseKeypointCoords, scale);
 
-		decodeMultiPose(&offsetsHost, &displacementFwdHost, &displacementBwdHost, &heatmapsHost, poseScores,
-			poseKeypointScores, poseKeypointCoords, scale);
-
-		const int poseCount = poseScores.size();
-		for (int i = 0; i < poseCount; ++i) {
-			if (poseScores[i] > MIN_POSE_SCORE) {
-				for (int id = 0; id < NUM_KEYPOINTS; ++id) {
-					if (poseKeypointScores[i][id] > SCORE_THRESHOLD) {
-						CV::Point point = poseKeypointCoords[i][id];
-						cv::circle(originalImage, cv::Point(point.fX, point.fY), 10, cv::Scalar(0, 255, 0), -1);
-					}
+	const int poseCount = poseScores.size();
+	for (int i = 0; i < poseCount; ++i) {
+		if (poseScores[i] > MIN_POSE_SCORE) {
+			for (int id = 0; id < NUM_KEYPOINTS; ++id) {
+				if (poseKeypointScores[i][id] > SCORE_THRESHOLD) {
+					CV::Point point = poseKeypointCoords[i][id];
+					cv::circle(originalImage, cv::Point(point.fX, point.fY), 10, cv::Scalar(0, 255, 0), -1);
 				}
 			}
 		}
-		cv::imshow("originalImage", originalImage);
-		if (cv::waitKey(1) == 'q') break;
-		const auto& timePost1 = std::chrono::steady_clock::now();
-
-		const auto& timeAll1 = std::chrono::steady_clock::now();
-		printf("Total time = %.3lf [msec]\n", (timeAll1 - timeAll0).count() / 1000000.0);
-		printf("Capture time = %.3lf [msec]\n", (timeCap1 - timeCap0).count() / 1000000.0);
-		printf("Inference time = %.3lf [msec]\n", (timeInference1 - timeInference0).count() / 1000000.0);
-		printf("PreProcess time = %.3lf [msec]\n", (timePre1 - timePre0).count() / 1000000.0);
-		printf("PostProcess time = %.3lf [msec]\n", (timePost1 - timePost0).count() / 1000000.0);
-		printf("========\n");
 	}
+	
+	return 0;
+}
 
-	/*** Finalize ***/
+
+int ImageProcessor_finalize(void)
+{
 	net->releaseSession(session);
-
+	net->releaseModel();
 	return 0;
 }

@@ -16,7 +16,7 @@
 
 /*** Macro ***/
 /* Model parameters */
-#define MODEL_NAME   RESOURCE_DIR"/model/posenet-mobilenet_v1_075.mnn"
+#define MODEL_NAME   RESOURCE_DIR"/model/mobilenet_v2_1.0_224.mnn"
 
 int main(int argc, const char* argv[])
 {

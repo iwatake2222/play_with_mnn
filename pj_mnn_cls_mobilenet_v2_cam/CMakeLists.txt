@@ -39,8 +39,8 @@ endif()
 add_executable(${ProjectName} Main.cpp)
 
 # Link ImageProcessor module
-add_subdirectory(../ImageProcessor ImageProcessor)
-target_include_directories(${ProjectName} PUBLIC ../ImageProcessor)
+add_subdirectory(./ImageProcessor ImageProcessor)
+target_include_directories(${ProjectName} PUBLIC ./ImageProcessor)
 target_link_libraries(${ProjectName} ImageProcessor)
 
 # For OpenCV
@@ -51,5 +51,6 @@ if(OpenCV_FOUND)
 endif()
 
 # Copy resouce
-file(COPY ${CMAKE_CURRENT_LIST_DIR}/../../resource/ DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-add_definitions(-DRESOURCE_DIR="${CMAKE_CURRENT_BINARY_DIR}/resource/")
+message(${CMAKE_BINARY_DIR})
+file(COPY ${CMAKE_CURRENT_LIST_DIR}/../resource DESTINATION ${CMAKE_BINARY_DIR}/)
+add_definitions(-DRESOURCE_DIR="${CMAKE_BINARY_DIR}/resource/")
