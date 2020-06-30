@@ -21,5 +21,13 @@
             android:layout_height="match_parent"
             android:layout_weight="0"/>
     </LinearLayout>
+    <Button
+        android:id="@+id/button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:text="Camera" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

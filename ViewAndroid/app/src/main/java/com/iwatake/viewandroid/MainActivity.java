@@ -21,6 +21,8 @@ import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Surface;
+import android.view.View;
+import android.widget.Button;
 import android.widget.ImageView;
 
 import com.google.common.util.concurrent.ListenableFuture;
@@ -55,6 +57,8 @@ public class MainActivity extends AppCompatActivity {
     private ImageAnalysis imageAnalysis = null;
     private ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
 
+    private int lensFacing = CameraSelector.LENS_FACING_BACK;
+
     // Used to load the 'native-lib' library on application startup.
     static {
         System.loadLibrary("opencv_java4");
@@ -69,6 +73,20 @@ public class MainActivity extends AppCompatActivity {
 
         previewView = findViewById(R.id.previewView);
         imageView = findViewById(R.id.imageView);
+        Button button = findViewById(R.id.button);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+                    lensFacing = CameraSelector.LENS_FACING_FRONT;
+                } else {
+                    lensFacing = CameraSelector.LENS_FACING_BACK;
+                }
+                startCamera();
+            }
+        });
+
+
 
         if (checkPermissions()) {
             ImageProcessorInitialize();
@@ -95,7 +113,7 @@ public class MainActivity extends AppCompatActivity {
 //                    preview = new Preview.Builder().build();
                     imageAnalysis = new ImageAnalysis.Builder().build();
                     imageAnalysis.setAnalyzer(cameraExecutor, new MyImageAnalyzer());
-                    CameraSelector cameraSelector = new CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_BACK).build();
+                    CameraSelector cameraSelector = new CameraSelector.Builder().requireLensFacing(lensFacing).build();
 
                     cameraProvider.unbindAll();
 //                    camera = cameraProvider.bindToLifecycle((LifecycleOwner)context, cameraSelector, preview, imageAnalysis);
@@ -121,6 +139,10 @@ public class MainActivity extends AppCompatActivity {
             /* Fix image rotation (it looks image in PreviewView is automatically fixed by CameraX???) */
             Mat mat = fixMatRotation(matOrg);
 
+            if (previewView.getDisplay() == null) {
+                image.close();
+                return;
+            }
             Log.i(TAG, "[analyze] width = " + image.getWidth() + ", height = " + image.getHeight() + "Rotation = " + previewView.getDisplay().getRotation());
             Log.i(TAG, "[analyze] mat width = " + matOrg.cols() + ", mat height = " + matOrg.rows());
 
@@ -184,7 +206,11 @@ public class MainActivity extends AppCompatActivity {
                 case Surface.ROTATION_0:
                     mat = new Mat(matOrg.cols(), matOrg.rows(), matOrg.type());
                     Core.transpose(matOrg, mat);
-                    Core.flip(mat, mat, 1);
+                    if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+                        Core.flip(mat, mat, 1);
+                    } else {
+                        Core.flip(mat, mat, 0);
+                    }
                     break;
                 case Surface.ROTATION_90:
                     mat = matOrg;
@@ -194,6 +220,7 @@ public class MainActivity extends AppCompatActivity {
                     Core.flip(mat, mat, -1);
                     break;
             }
+
             return mat;
         }
     }
