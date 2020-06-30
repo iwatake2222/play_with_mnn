@@ -44,14 +44,16 @@ int main(int argc, const char* argv[])
 		//cv::Mat originalImage = cv::imread(IMAGE_NAME);
 		cv::Mat originalImage;
 		cap.read(originalImage);
+		cv::Mat outputImage;
+		originalImage.copyTo(outputImage);		// need to copy because OpenCV may reuse or release captured mat
 		const auto& timeCap1 = std::chrono::steady_clock::now();
 
 		/* Call image processor library */
 		const auto& timeProcess0 = std::chrono::steady_clock::now();
-		ImageProcessor_process(&originalImage);
+		ImageProcessor_process(&outputImage);
 		const auto& timeProcess1 = std::chrono::steady_clock::now();
 
-		cv::imshow("test", originalImage);
+		cv::imshow("test", outputImage);
 		if (cv::waitKey(1) == 'q') break;
 		const auto& timePost1 = std::chrono::steady_clock::now();
 
