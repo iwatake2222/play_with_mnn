@@ -24,6 +24,7 @@ import android.view.Surface;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
@@ -46,10 +47,18 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MyApp";
     private int REQUEST_CODE_FOR_PERMISSIONS = 1234;;
     private final String[] REQUIRED_PERMISSIONS = new String[]{"android.permission.CAMERA", "android.permission.WRITE_EXTERNAL_STORAGE"};
+    private enum AppStatus {
+        NotInitialized,
+        Initialized,
+        Running,
+    };
 
     /*** Views ***/
     private PreviewView previewView;
     private ImageView imageView;
+    private Button buttonCamera;
+    private TextView textViewFps;
+    private TextView textViewImageProcessTime;
 
     /*** For CameraX ***/
     private Camera camera = null;
@@ -58,6 +67,7 @@ public class MainActivity extends AppCompatActivity {
     private ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
 
     private int lensFacing = CameraSelector.LENS_FACING_BACK;
+    private AppStatus appStatus = AppStatus.NotInitialized;
 
     // Used to load the 'native-lib' library on application startup.
     static {
@@ -73,23 +83,29 @@ public class MainActivity extends AppCompatActivity {
 
         previewView = findViewById(R.id.previewView);
         imageView = findViewById(R.id.imageView);
-        Button button = findViewById(R.id.button);
-        button.setOnClickListener(new View.OnClickListener() {
+        buttonCamera = findViewById(R.id.buttonCamera);
+        textViewFps = findViewById(R.id.textViewFps);
+        textViewImageProcessTime = findViewById(R.id.textViewImageProcessTime);
+
+        buttonCamera.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 if (lensFacing == CameraSelector.LENS_FACING_BACK) {
                     lensFacing = CameraSelector.LENS_FACING_FRONT;
+                    buttonCamera.setText("BACK");
                 } else {
                     lensFacing = CameraSelector.LENS_FACING_BACK;
+                    buttonCamera.setText("FRONT");
                 }
                 startCamera();
             }
         });
 
-
-
         if (checkPermissions()) {
-            ImageProcessorInitialize();
+            if (appStatus == AppStatus.NotInitialized) {
+                ImageProcessorInitialize();
+                appStatus = AppStatus.Initialized;
+            }
             startCamera();
         } else {
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_FOR_PERMISSIONS);
@@ -99,7 +115,18 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        ImageProcessorFinalize();
+        imageAnalysis.clearAnalyzer();
+        while (appStatus == AppStatus.Running) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        if (appStatus == AppStatus.Initialized) {
+            appStatus = AppStatus.NotInitialized;
+            ImageProcessorFinalize();
+        }
     }
 
     private void startCamera() {
@@ -129,40 +156,50 @@ public class MainActivity extends AppCompatActivity {
     private class MyImageAnalyzer implements ImageAnalysis.Analyzer {
         private long previousTime = System.nanoTime();
         private float averageFPS = 0;
+        private long averageImageProcessTime = 0;
         private int frameCount = 0;
 
         @Override
         public void analyze(@NonNull ImageProxy image) {
+            if (previewView.getDisplay() == null || appStatus != AppStatus.Initialized) {
+                image.close();
+                return;
+            }
+
             /* Create cv::mat(RGB888) from image(NV21) */
             Mat matOrg = getMatFromImage(image);
 
             /* Fix image rotation (it looks image in PreviewView is automatically fixed by CameraX???) */
             Mat mat = fixMatRotation(matOrg);
 
-            if (previewView.getDisplay() == null) {
-                image.close();
-                return;
-            }
-            Log.i(TAG, "[analyze] width = " + image.getWidth() + ", height = " + image.getHeight() + "Rotation = " + previewView.getDisplay().getRotation());
-            Log.i(TAG, "[analyze] mat width = " + matOrg.cols() + ", mat height = " + matOrg.rows());
+//            Log.i(TAG, "[analyze] width = " + image.getWidth() + ", height = " + image.getHeight() + "Rotation = " + previewView.getDisplay().getRotation());
+//            Log.i(TAG, "[analyze] mat width = " + matOrg.cols() + ", mat height = " + matOrg.rows());
 
             /* Do some image processing */
+            appStatus = AppStatus.Running;
+            long imageProcessTimeStart = System.nanoTime();
             ImageProcessorProcess(mat.getNativeObjAddr());
+            long imageProcessTimeEnd = System.nanoTime();
+            appStatus = AppStatus.Initialized;
             Mat matOutput = mat;
 //            Mat matOutput = new Mat(mat.rows(), mat.cols(), mat.type());
 //            if (matPrevious == null) matPrevious = mat;
 //            Core.absdiff(mat, matPrevious, matOutput);
 //            matPrevious = mat;
 
-            /* Draw FPS */
+            /* Calculate FPS */
             long currentTime = System.nanoTime();
             float fps = 1000000000 / (currentTime - previousTime);
             previousTime = currentTime;
             frameCount++;
             averageFPS = (averageFPS * (frameCount - 1) + fps) / frameCount;
-            Formatter fm = new Formatter();
-            fm.format("%4.1f FPS (%4.1f FPS)", averageFPS, fps);
-            Imgproc.putText(matOutput,  fm.toString(), new Point(10, 50), 1, 2, new Scalar(0, 255, 0));
+            Formatter fmFps = new Formatter();
+            fmFps.format("%4.1f (%4.1f) [FPS]", averageFPS, fps);
+
+            long imageProcessTime = imageProcessTimeEnd - imageProcessTimeStart;
+            averageImageProcessTime = (long)((averageImageProcessTime * (frameCount - 1) + imageProcessTime) / frameCount);
+            Formatter fmImageProcessTime = new Formatter();
+            fmImageProcessTime.format("%d (%d) [msec]", averageImageProcessTime/1000000, imageProcessTime/1000000);
 
             /* Convert cv::mat to bitmap for drawing */
             Bitmap bitmap = Bitmap.createBitmap(matOutput.cols(), matOutput.rows(),Bitmap.Config.ARGB_8888);
@@ -173,6 +210,8 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void run() {
                     imageView.setImageBitmap(bitmap);
+                    textViewFps.setText(fmFps.toString());
+                    textViewImageProcessTime.setText(fmImageProcessTime.toString());
                 }
             });
 
@@ -240,6 +279,7 @@ public class MainActivity extends AppCompatActivity {
         if(requestCode == REQUEST_CODE_FOR_PERMISSIONS){
             if(checkPermissions()){
                 ImageProcessorInitialize();
+                appStatus = AppStatus.Initialized;
                 startCamera();
             } else{
                 Log.i(TAG, "[onRequestPermissionsResult] Failed to get permissions");

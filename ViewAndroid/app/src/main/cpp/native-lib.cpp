@@ -12,7 +12,8 @@ Java_com_iwatake_viewandroid_MainActivity_ImageProcessorInitialize(
         jobject /* this */) {
 
     int ret = 0;
-    ret = ImageProcessor_initialize(MODEL_FILENAME);
+    INPUT_PARAM inputParam;
+    ret = ImageProcessor_initialize(MODEL_FILENAME, &inputParam);
     return ret;
 }
 
@@ -24,7 +25,8 @@ Java_com_iwatake_viewandroid_MainActivity_ImageProcessorProcess(
 
     int ret = 0;
     cv::Mat* mat = (cv::Mat*) objMat;
-    ret = ImageProcessor_process(mat);
+    OUTPUT_PARAM outputParam;
+    ret = ImageProcessor_process(mat, &outputParam);
     return ret;
 }
 
