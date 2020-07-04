@@ -1,6 +1,8 @@
 /*** Include ***/
 /* for general */
 #include <stdio.h>
+#include <stdlib.h>
+#include <string>
 #include <algorithm>
 #include <fstream>
 #include <functional>

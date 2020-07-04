@@ -1,6 +1,8 @@
 /*** Include ***/
 /* for general */
 #include <stdio.h>
+#include <stdlib.h>
+#include <string>
 #include <algorithm>
 #include <fstream>
 #include <functional>
@@ -154,7 +156,7 @@ int ImageProcessor_process(cv::Mat *mat, OUTPUT_PARAM *outputParam)
 	
 	/* Contain the results */
 	outputParam->classId = tempValues[0].first;
-	strcpy_s(outputParam->label, sizeof(outputParam->label), s_labels[tempValues[0].first].c_str());
+	snprintf(outputParam->label, sizeof(outputParam->label), s_labels[tempValues[0].first].c_str());
 	outputParam->score = tempValues[0].second;
 
 	return 0;

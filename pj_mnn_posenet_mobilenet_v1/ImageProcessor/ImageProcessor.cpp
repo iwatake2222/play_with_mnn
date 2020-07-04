@@ -1,6 +1,8 @@
 /*** Include ***/
 /* for general */
 #include <stdio.h>
+#include <stdlib.h>
+#include <string>
 #include <algorithm>
 #include <fstream>
 #include <functional>
@@ -338,7 +340,6 @@ int ImageProcessor_process(cv::Mat *mat, OUTPUT_PARAM *outputParam)
 	scale.fY = (float)originalImageHeight / (float)targetHeight;
 
 	/*** Pre process (resize, colorconversion, normalize) ***/
-	const auto& timePre0 = std::chrono::steady_clock::now();
 	MNN::CV::ImageProcess::Config imageProcessconfig;
 	imageProcessconfig.filterType = MNN::CV::BILINEAR;
 	float mean[3] = { 127.5f, 127.5f, 127.5f };
@@ -355,16 +356,12 @@ int ImageProcessor_process(cv::Mat *mat, OUTPUT_PARAM *outputParam)
 	std::shared_ptr<MNN::CV::ImageProcess> pretreat(MNN::CV::ImageProcess::create(imageProcessconfig));
 	pretreat->setMatrix(trans);
 	pretreat->convert((uint8_t*)mat->data, originalImageWidth, originalImageHeight, 0, input);
-	const auto& timePre1 = std::chrono::steady_clock::now();
 
 	/*** Inference ***/
-	const auto& timeInference0 = std::chrono::steady_clock::now();
 	s_net->runSession(s_session);
-	const auto& timeInference1 = std::chrono::steady_clock::now();
 
 	/*** Post process ***/
 	/* Retreive results */
-	const auto& timePost0 = std::chrono::steady_clock::now();
 	auto offsets = s_net->getSessionOutput(s_session, OFFSET_NODE_NAME);
 	auto displacementFwd = s_net->getSessionOutput(s_session, DISPLACE_FWD_NODE_NAME);
 	auto displacementBwd = s_net->getSessionOutput(s_session, DISPLACE_BWD_NODE_NAME);

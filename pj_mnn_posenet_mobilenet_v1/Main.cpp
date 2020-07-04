@@ -1,12 +1,10 @@
 /*** Include ***/
 /* for general */
 #include <stdio.h>
-#include <algorithm>
-#include <fstream>
-#include <functional>
-#include <memory>
-#include <sstream>
+#include <stdlib.h>
+#include <string>
 #include <vector>
+#include <algorithm>
 #include <chrono>
 
 /* for OpenCV */
@@ -20,7 +18,7 @@
 #define IMAGE_NAME   RESOURCE_DIR"/ZOM93_minatomirainodate20140503_TP_V4.jpg"
 
 /* Settings */
-//#define TEST_SPEED_ONLY
+// #define TEST_SPEED_ONLY
 #define LOOP_NUM_FOR_TIME_MEASUREMENT 10
 
 int main(int argc, const char* argv[])
@@ -76,7 +74,6 @@ int main(int argc, const char* argv[])
 
 		cv::imshow("test", originalImage);
 		if (cv::waitKey(1) == 'q') break;
-		const auto& timePost1 = std::chrono::steady_clock::now();
 
 		const auto& timeAll1 = std::chrono::steady_clock::now();
 		printf("Total time = %.3lf [msec]\n", (timeAll1 - timeAll0).count() / 1000000.0);
