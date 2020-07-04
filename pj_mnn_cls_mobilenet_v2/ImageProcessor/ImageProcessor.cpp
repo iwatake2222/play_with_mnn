@@ -17,6 +17,8 @@
 #include <MNN/Interpreter.hpp>
 #include <MNN/AutoTime.hpp>
 
+#include "ImageProcessor.h"
+
 /*** Macro ***/
 #if defined(ANDROID) || defined(__ANDROID__)
 #include <android/log.h>
@@ -26,37 +28,63 @@
 #define PRINT(...) printf(__VA_ARGS__)
 #endif
 
+#define CHECK(x)                              \
+  if (!(x)) {                                                \
+	PRINT("Error at %s:%d\n", __FILE__, __LINE__); \
+	exit(1);                                                 \
+  }
+
 /*** Global variables ***/
-static MNN::Interpreter *net;
-static MNN::Session* session;
+static MNN::Interpreter *s_net;
+static MNN::Session* s_session;
+static std::vector<std::string> s_labels;
 
 /*** Functions ***/
-int ImageProcessor_initialize(const char *modelFilename)
+static void readLabel(const char* filename, std::vector<std::string> & labels)
+{
+	std::ifstream ifs(filename);
+	if (ifs.fail()) {
+		PRINT("failed to read %s\n", filename);
+		return;
+	}
+	std::string str;
+	while (getline(ifs, str)) {
+		labels.push_back(str);
+	}
+}
+
+int ImageProcessor_initialize(const char *modelFilename, INPUT_PARAM *inputParam)
 {
 	/* Create interpreter */
-	net = MNN::Interpreter::createFromFile(modelFilename);
+	s_net = MNN::Interpreter::createFromFile(modelFilename);
+	CHECK(s_net != NULL);
 	MNN::ScheduleConfig scheduleConfig;
 	scheduleConfig.type  = MNN_FORWARD_AUTO;
 	scheduleConfig.numThread = 4;
 	// BackendConfig bnconfig;
 	// bnconfig.precision = BackendConfig::Precision_Low;
 	// config.backendConfig = &bnconfig;
-	session = net->createSession(scheduleConfig);
+	s_session = s_net->createSession(scheduleConfig);
+	CHECK(s_session != NULL);
 
 	/* Get model information */
-	auto input = net->getSessionInput(session, NULL);
+	auto input = s_net->getSessionInput(s_session, NULL);
 	int modelChannel = input->channel();
 	int modelHeight  = input->height();
 	int modelWidth   = input->width();
 	PRINT("model input size: widgh = %d , height = %d, channel = %d\n", modelWidth, modelHeight, modelChannel);
 
+	/* read label */
+	readLabel(inputParam->labelFilename, s_labels);
+
 	return 0;
 }
 
-int ImageProcessor_process(cv::Mat *mat)
+int ImageProcessor_process(cv::Mat *mat, OUTPUT_PARAM *outputParam)
 {
 	/* Get size information */
-	auto input = net->getSessionInput(session, NULL);
+	auto input = s_net->getSessionInput(s_session, NULL);
+	CHECK(input != NULL);
 	int modelChannel = input->channel();
 	int modelHeight = input->height();
 	int modelWidth = input->width();
@@ -81,11 +109,12 @@ int ImageProcessor_process(cv::Mat *mat)
 	pretreat->convert((uint8_t*)mat->data, imageWidth, imageHeight, 0, input);
 
 	/*** Inference ***/
-	net->runSession(session);
+	s_net->runSession(s_session);
 
 	/*** Post process ***/
 	/* Retreive results */
-	auto output = net->getSessionOutput(session, NULL);
+	auto output = s_net->getSessionOutput(s_session, NULL);
+	CHECK(output != NULL);
 	auto dimType = output->getDimensionType();
 
 	std::shared_ptr<MNN::Tensor> outputUser(new MNN::Tensor(output, dimType));
@@ -114,22 +143,28 @@ int ImageProcessor_process(cv::Mat *mat)
 	int length = size > 10 ? 10 : size;
 	PRINT("==========\n");
 	for (int i = 0; i < length; ++i) {
-		PRINT("%d: %f\n", tempValues[i].first, tempValues[i].second);
+		PRINT("%s(%d): %f\n", s_labels[tempValues[i].first].c_str(), tempValues[i].first, tempValues[i].second);
 	}
 
 	/* Draw the result */
 	std::string resultStr;
-	resultStr = "Result:" + std::to_string(tempValues[0].first) + " (score = " + std::to_string(tempValues[0].second) + ")";
+	resultStr = "Result:" + s_labels[tempValues[0].first] + "(" + std::to_string(tempValues[0].first) + ") (score=" + std::to_string(tempValues[0].second) + ")";
 	cv::putText(*mat, resultStr, cv::Point(100, 100), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 0), 3);
 	cv::putText(*mat, resultStr, cv::Point(100, 100), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0), 1);
 	
+	/* Contain the results */
+	outputParam->classId = tempValues[0].first;
+	strcpy_s(outputParam->label, sizeof(outputParam->label), s_labels[tempValues[0].first].c_str());
+	outputParam->score = tempValues[0].second;
+
 	return 0;
 }
 
 
 int ImageProcessor_finalize(void)
 {
-	net->releaseSession(session);
-	net->releaseModel();
+	s_net->releaseSession(s_session);
+	s_net->releaseModel();
+	delete s_net;
 	return 0;
 }

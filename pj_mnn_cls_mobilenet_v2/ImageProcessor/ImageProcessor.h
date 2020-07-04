@@ -6,8 +6,18 @@ namespace cv {
 	class Mat;
 };
 
-int ImageProcessor_initialize(const char *modelFilename);
-int ImageProcessor_process(cv::Mat *mat);
+typedef struct {
+	char labelFilename[256];
+} INPUT_PARAM;
+
+typedef struct {
+	int classId;
+	char label[256];
+	double score;
+} OUTPUT_PARAM;
+
+int ImageProcessor_initialize(const char *modelFilename, INPUT_PARAM *inputParam);
+int ImageProcessor_process(cv::Mat *mat, OUTPUT_PARAM *outputParam);
 int ImageProcessor_finalize(void);
 
 #endif

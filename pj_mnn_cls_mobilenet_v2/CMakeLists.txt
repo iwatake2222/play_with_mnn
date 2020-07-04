@@ -45,10 +45,8 @@ target_link_libraries(${ProjectName} ImageProcessor)
 
 # For OpenCV
 find_package(OpenCV REQUIRED)
-if(OpenCV_FOUND)
-	target_include_directories(${ProjectName} PUBLIC ${OpenCV_INCLUDE_DIRS})
-	target_link_libraries(${ProjectName} ${OpenCV_LIBS})
-endif()
+target_include_directories(${ProjectName} PUBLIC ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(${ProjectName} ${OpenCV_LIBS})
 
 # Copy resouce
 message(${CMAKE_BINARY_DIR})

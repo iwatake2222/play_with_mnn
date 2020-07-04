@@ -17,7 +17,8 @@
 #include <MNN/Interpreter.hpp>
 #include <MNN/AutoTime.hpp>
 
-/*** Macro ***/
+#include "ImageProcessor.h"
+
 /*** Macro ***/
 #if defined(ANDROID) || defined(__ANDROID__)
 #include <android/log.h>
@@ -27,6 +28,15 @@
 #define PRINT(...) printf(__VA_ARGS__)
 #endif
 
+#define CHECK(x)                              \
+  if (!(x)) {                                                \
+	PRINT("Error at %s:%d\n", __FILE__, __LINE__); \
+	exit(1);                                                 \
+  }
+
+/*** Global variables ***/
+static MNN::Interpreter *s_net;
+static MNN::Session* s_session;
 
 /*** [Start] Retrieved from demo source code in MNN (multiPose.cpp/.h) ***/
 using namespace MNN;
@@ -286,43 +296,43 @@ static int decodeMultiPose(const Tensor* offsets, const Tensor* displacementFwd,
 }
 
 /*** [End] Retrieved from demo source code in MNN (multiPose.cpp/.h) ***/
-static MNN::Interpreter *net;
-static Session* session;
-int ImageProcessor_initialize(const char *modelFilename)
+
+
+int ImageProcessor_initialize(const char *modelFilename, INPUT_PARAM *inputParam)
 {
 	/* Create interpreter */
-	net = MNN::Interpreter::createFromFile(modelFilename);
+	s_net = MNN::Interpreter::createFromFile(modelFilename);
+	CHECK(s_net != NULL);
 	MNN::ScheduleConfig scheduleConfig;
 	scheduleConfig.type  = MNN_FORWARD_AUTO;
 	scheduleConfig.numThread = 4;
 	// BackendConfig bnconfig;
 	// bnconfig.precision = BackendConfig::Precision_Low;
 	// config.backendConfig = &bnconfig;
-	session = net->createSession(scheduleConfig);
-
+	s_session = s_net->createSession(scheduleConfig);
+	CHECK(s_session != NULL);
 
 	return 0;
 }
 
-int ImageProcessor_process(cv::Mat *mat)
+int ImageProcessor_process(cv::Mat *mat, OUTPUT_PARAM *outputParam)
 {
-	cv::Mat originalImage = *mat;
-
 	/* Fix model input size */
 	int imageWidth = 225;
 	int imageHeight = 225;
-	auto input = net->getSessionInput(session, NULL);
+	auto input = s_net->getSessionInput(s_session, NULL);
+	CHECK(input != NULL);
 	static int targetWidth = static_cast<int>((float)imageWidth / (float)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1;
 	static int targetHeight = static_cast<int>((float)imageHeight / (float)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1;
-	net->resizeTensor(input, { 1, 3, targetHeight, targetWidth });
-	net->resizeSession(session);
+	s_net->resizeTensor(input, { 1, 3, targetHeight, targetWidth });
+	s_net->resizeSession(s_session);
 	int modelChannel = input->channel();
 	int modelHeight = input->height();
 	int modelWidth = input->width();
 	//PRINT("model input size: widgh = %d , height = %d, channel = %d\n", modelWidth, modelHeight, modelChannel);
 
-	int originalImageWidth = originalImage.cols;
-	int originalImageHeight = originalImage.cols;
+	int originalImageWidth = mat->cols;
+	int originalImageHeight = mat->cols;
 	MNN::CV::Point scale;
 	scale.fX = (float)originalImageWidth / (float)targetWidth;
 	scale.fY = (float)originalImageHeight / (float)targetHeight;
@@ -344,21 +354,25 @@ int ImageProcessor_process(cv::Mat *mat)
 
 	std::shared_ptr<MNN::CV::ImageProcess> pretreat(MNN::CV::ImageProcess::create(imageProcessconfig));
 	pretreat->setMatrix(trans);
-	pretreat->convert((uint8_t*)originalImage.data, originalImageWidth, originalImageHeight, 0, input);
+	pretreat->convert((uint8_t*)mat->data, originalImageWidth, originalImageHeight, 0, input);
 	const auto& timePre1 = std::chrono::steady_clock::now();
 
 	/*** Inference ***/
 	const auto& timeInference0 = std::chrono::steady_clock::now();
-	net->runSession(session);
+	s_net->runSession(s_session);
 	const auto& timeInference1 = std::chrono::steady_clock::now();
 
 	/*** Post process ***/
 	/* Retreive results */
 	const auto& timePost0 = std::chrono::steady_clock::now();
-	auto offsets = net->getSessionOutput(session, OFFSET_NODE_NAME);
-	auto displacementFwd = net->getSessionOutput(session, DISPLACE_FWD_NODE_NAME);
-	auto displacementBwd = net->getSessionOutput(session, DISPLACE_BWD_NODE_NAME);
-	auto heatmaps = net->getSessionOutput(session, HEATMAPS);
+	auto offsets = s_net->getSessionOutput(s_session, OFFSET_NODE_NAME);
+	auto displacementFwd = s_net->getSessionOutput(s_session, DISPLACE_FWD_NODE_NAME);
+	auto displacementBwd = s_net->getSessionOutput(s_session, DISPLACE_BWD_NODE_NAME);
+	auto heatmaps = s_net->getSessionOutput(s_session, HEATMAPS);
+	CHECK(offsets != NULL);
+	CHECK(displacementFwd != NULL);
+	CHECK(displacementBwd != NULL);
+	CHECK(heatmaps != NULL);
 
 	MNN::Tensor offsetsHost(offsets, MNN::Tensor::CAFFE);
 	MNN::Tensor displacementFwdHost(displacementFwd, MNN::Tensor::CAFFE);
@@ -383,7 +397,7 @@ int ImageProcessor_process(cv::Mat *mat)
 			for (int id = 0; id < NUM_KEYPOINTS; ++id) {
 				if (poseKeypointScores[i][id] > SCORE_THRESHOLD) {
 					CV::Point point = poseKeypointCoords[i][id];
-					cv::circle(originalImage, cv::Point(point.fX, point.fY), 10, cv::Scalar(0, 255, 0), -1);
+					cv::circle(*mat, cv::Point(point.fX, point.fY), 10, cv::Scalar(0, 255, 0), -1);
 				}
 			}
 		}
@@ -395,7 +409,8 @@ int ImageProcessor_process(cv::Mat *mat)
 
 int ImageProcessor_finalize(void)
 {
-	net->releaseSession(session);
-	net->releaseModel();
+	s_net->releaseSession(s_session);
+	s_net->releaseModel();
+	delete s_net;
 	return 0;
 }

@@ -17,6 +17,8 @@
 #include <MNN/Interpreter.hpp>
 #include <MNN/AutoTime.hpp>
 
+#include "ImageProcessor.h"
+
 /*** Macro ***/
 #if defined(ANDROID) || defined(__ANDROID__)
 #include <android/log.h>
@@ -26,25 +28,33 @@
 #define PRINT(...) printf(__VA_ARGS__)
 #endif
 
+#define CHECK(x)                              \
+  if (!(x)) {                                                \
+	PRINT("Error at %s:%d\n", __FILE__, __LINE__); \
+	exit(1);                                                 \
+  }
+
 /*** Global variables ***/
-static MNN::Interpreter *net;
-static MNN::Session* session;
+static MNN::Interpreter *s_net;
+static MNN::Session* s_session;
 
 /*** Functions ***/
-int ImageProcessor_initialize(const char *modelFilename)
+int ImageProcessor_initialize(const char *modelFilename, INPUT_PARAM *inputParam)
 {
 	/* Create interpreter */
-	net = MNN::Interpreter::createFromFile(modelFilename);
+	s_net = MNN::Interpreter::createFromFile(modelFilename);
+	CHECK(s_net != NULL);
 	MNN::ScheduleConfig scheduleConfig;
 	scheduleConfig.type  = MNN_FORWARD_AUTO;
 	scheduleConfig.numThread = 4;
 	// BackendConfig bnconfig;
 	// bnconfig.precision = BackendConfig::Precision_Low;
 	// config.backendConfig = &bnconfig;
-	session = net->createSession(scheduleConfig);
+	s_session = s_net->createSession(scheduleConfig);
+	CHECK(s_session != NULL);
 
 	/* Get model information */
-	auto input = net->getSessionInput(session, NULL);
+	auto input = s_net->getSessionInput(s_session, NULL);
 	int modelChannel = input->channel();
 	int modelHeight  = input->height();
 	int modelWidth   = input->width();
@@ -53,10 +63,11 @@ int ImageProcessor_initialize(const char *modelFilename)
 	return 0;
 }
 
-int ImageProcessor_process(cv::Mat *mat)
+int ImageProcessor_process(cv::Mat *mat, OUTPUT_PARAM *outputParam)
 {
 	/* Get size information */
-	auto input = net->getSessionInput(session, NULL);
+	auto input = s_net->getSessionInput(s_session, NULL);
+	CHECK(input != NULL);
 	int modelChannel = input->channel();
 	int modelHeight = input->height();
 	int modelWidth = input->width();
@@ -81,11 +92,12 @@ int ImageProcessor_process(cv::Mat *mat)
 	pretreat->convert((uint8_t*)mat->data, imageWidth, imageHeight, 0, input);
 
 	/*** Inference ***/
-	net->runSession(session);
+	s_net->runSession(s_session);
 
 	/*** Post process ***/
 	/* Retreive results */
-	auto output = net->getSessionOutput(session, NULL);
+	auto output = s_net->getSessionOutput(s_session, NULL);
+	CHECK(output != NULL);
 	auto dimType = output->getDimensionType();
 	dimType = MNN::Tensor::TENSORFLOW;
 
@@ -94,7 +106,7 @@ int ImageProcessor_process(cv::Mat *mat)
 	auto outputWidth = outputUser->shape()[2];
 	auto outputHeight = outputUser->shape()[1];
 	auto outputCannel = outputUser->shape()[3];
-	printf("output size: width = %d, height = %d, channel = %d\n", outputWidth, outputHeight, outputCannel);
+	PRINT("output size: width = %d, height = %d, channel = %d\n", outputWidth, outputHeight, outputCannel);
 
 	auto values = outputUser->host<float>();
 	cv::Mat outputImage = cv::Mat::zeros(outputHeight, outputWidth, CV_8UC3);
@@ -110,9 +122,9 @@ int ImageProcessor_process(cv::Mat *mat)
 				}
 			}
 
-			float colorRatioB = (maxChannel % 2 + 1) / 2.0;
-			float colorRatioG = (maxChannel % 3 + 1) / 3.0;
-			float colorRatioR = (maxChannel % 4 + 1) / 4.0;
+			float colorRatioB = (maxChannel % 2 + 1) / 2.0f;
+			float colorRatioG = (maxChannel % 3 + 1) / 3.0f;
+			float colorRatioR = (maxChannel % 4 + 1) / 4.0f;
 			outputImage.data[(y * outputWidth + x) * 3 + 0] = (int)(255 * colorRatioB);
 			outputImage.data[(y * outputWidth + x) * 3 + 1] = (int)(255 * colorRatioG);
 			outputImage.data[(y * outputWidth + x) * 3 + 2] = (int)(255 * (1 - colorRatioR));
@@ -129,7 +141,8 @@ int ImageProcessor_process(cv::Mat *mat)
 
 int ImageProcessor_finalize(void)
 {
-	net->releaseSession(session);
-	net->releaseModel();
+	s_net->releaseSession(s_session);
+	s_net->releaseModel();
+	delete s_net;
 	return 0;
 }
