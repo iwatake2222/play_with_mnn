@@ -135,6 +135,7 @@ int32_t ClassificationEngine::invoke(const cv::Mat& originalMat, RESULT& result)
 	/*** PreProcess ***/
 	const auto& tPreProcess0 = std::chrono::steady_clock::now();
 	InputTensorInfo& inputTensorInfo = m_inputTensorList[0];
+#if 1
 	/* do resize and color conversion here because some inference engine doesn't support these operations */
 	cv::Mat imgSrc;
 	cv::resize(originalMat, imgSrc, cv::Size(inputTensorInfo.tensorDims.width, inputTensorInfo.tensorDims.height));
@@ -152,6 +153,26 @@ int32_t ClassificationEngine::invoke(const cv::Mat& originalMat, RESULT& result)
 	inputTensorInfo.imageInfo.cropHeight = imgSrc.rows;
 	inputTensorInfo.imageInfo.isBGR = true;
 	inputTensorInfo.imageInfo.swapColor = false;
+#else
+	/* Test other input format */
+	cv::Mat imgSrc;
+	inputTensorInfo.data = originalMat.data;
+	inputTensorInfo.dataType = InputTensorInfo::DATA_TYPE_IMAGE;
+	inputTensorInfo.imageInfo.width = originalMat.cols;
+	inputTensorInfo.imageInfo.height = originalMat.rows;
+	inputTensorInfo.imageInfo.channel = originalMat.channels();
+	inputTensorInfo.imageInfo.cropX = 0;
+	inputTensorInfo.imageInfo.cropY = 0;
+	inputTensorInfo.imageInfo.cropWidth = originalMat.cols;
+	inputTensorInfo.imageInfo.cropHeight = originalMat.rows;
+	inputTensorInfo.imageInfo.isBGR = true;
+	inputTensorInfo.imageInfo.swapColor = true;
+	//InferenceHelper::preProcessByOpenCV(inputTensorInfo, false, imgSrc);
+	InferenceHelper::preProcessByOpenCV(inputTensorInfo, true, imgSrc);
+	inputTensorInfo.data = imgSrc.data;
+	//inputTensorInfo.dataType = InputTensorInfo::DATA_TYPE_BLOB_NHWC;
+	inputTensorInfo.dataType = InputTensorInfo::DATA_TYPE_BLOB_NCHW;
+#endif
 	if (m_inferenceHelper->preProcess(m_inputTensorList) != InferenceHelper::RET_OK) {
 		return RET_ERR;
 	}

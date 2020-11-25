@@ -62,9 +62,40 @@ int32_t InferenceHelperMnn::initialize(const std::string& modelFilename, std::ve
 	// bnconfig.precision = BackendConfig::Precision_Low;
 	// config.backendConfig = &bnconfig;
 	m_session = m_net->createSession(scheduleConfig);
-	if (!m_net) {
+	if (!m_session) {
 		PRINT_E("Failed to create session\n");
 		return RET_ERR;
+	}
+
+	/* Check tensor info fits the info from model */
+	for (const auto& inputTensorInfo : inputTensorInfoList) {
+		auto inputTensor = m_net->getSessionInput(m_session, inputTensorInfo.name.c_str());
+		if (inputTensor == nullptr) {
+			PRINT_E("Invalid input name (%s)\n", inputTensorInfo.name.c_str());
+			return RET_ERR;
+		}
+		if ((inputTensor->getType().code == halide_type_float) && (inputTensorInfo.tensorType == TensorInfo::TENSOR_TYPE_FP32)) {
+			/* OK */
+		} else if ((inputTensor->getType().code == halide_type_uint) && (inputTensorInfo.tensorType == TensorInfo::TENSOR_TYPE_UINT8)) {
+			/* OK */
+		} else {
+			PRINT_E("Incorrect input tensor type (%d, %d)\n", inputTensor->getType().code, inputTensorInfo.tensorType);
+			return RET_ERR;
+		}
+		if ((inputTensor->channel() == inputTensorInfo.tensorDims.channel) && (inputTensor->height() == inputTensorInfo.tensorDims.height) && (inputTensor->width() == inputTensorInfo.tensorDims.width)) {
+			/* OK */
+		} else {
+			PRINT_E("Incorrect input tensor size\n");
+			return RET_ERR;
+		}
+	}
+	for (const auto& outputTensorInfo : outputTensorInfoList) {
+		auto outputTensor = m_net->getSessionOutput(m_session, outputTensorInfo.name.c_str());
+		if (outputTensor == nullptr) {
+			PRINT_E("Invalid output name (%s)\n", outputTensorInfo.name.c_str());
+			return RET_ERR;
+		}
+		/* Output size is set when run inference later */
 	}
 
 	return RET_OK;
@@ -85,7 +116,7 @@ int32_t InferenceHelperMnn::preProcess(const std::vector<InputTensorInfo>& input
 	for (const auto& inputTensorInfo : inputTensorInfoList) {
 		auto inputTensor = m_net->getSessionInput(m_session, inputTensorInfo.name.c_str());
 		if (inputTensor == nullptr) {
-			PRINT_E("Invalid output name (%s)\n", inputTensorInfo.name.c_str());
+			PRINT_E("Invalid input name (%s)\n", inputTensorInfo.name.c_str());
 			return RET_ERR;
 		}
 		if (inputTensorInfo.dataType == InputTensorInfo::DATA_TYPE_IMAGE) {
@@ -131,12 +162,23 @@ int32_t InferenceHelperMnn::preProcess(const std::vector<InputTensorInfo>& input
 			std::shared_ptr<MNN::CV::ImageProcess> pretreat(MNN::CV::ImageProcess::create(imageProcessconfig));
 			pretreat->setMatrix(trans);
 			pretreat->convert(static_cast<uint8_t*>(inputTensorInfo.data), inputTensorInfo.imageInfo.cropWidth, inputTensorInfo.imageInfo.cropHeight, 0, inputTensor);
-		} else if (inputTensorInfo.dataType == InputTensorInfo::DATA_TYPE_BLOB_NHWC) {
-			PRINT_E("Unsupported data type (%d)\n", inputTensorInfo.dataType);
-			return RET_ERR;
-		} else if (inputTensorInfo.dataType == InputTensorInfo::DATA_TYPE_BLOB_NCHW) {
-			PRINT_E("Unsupported data type (%d)\n", inputTensorInfo.dataType);
-			return RET_ERR;
+		} else if ( (inputTensorInfo.dataType == InputTensorInfo::DATA_TYPE_BLOB_NHWC) || (inputTensorInfo.dataType == InputTensorInfo::DATA_TYPE_BLOB_NCHW) ) {
+			std::unique_ptr<MNN::Tensor> tensor;
+			if (inputTensorInfo.dataType == InputTensorInfo::DATA_TYPE_BLOB_NHWC) {
+				tensor.reset(new MNN::Tensor(inputTensor, MNN::Tensor::TENSORFLOW));
+			} else {
+				tensor.reset(new MNN::Tensor(inputTensor, MNN::Tensor::CAFFE));
+			}
+			if (tensor->getType().code == halide_type_float) {
+				for (int32_t i = 0; i < inputTensorInfo.tensorDims.width * inputTensorInfo.tensorDims.height * inputTensorInfo.tensorDims.channel; i++) {
+					tensor->host<float_t>()[i] = static_cast<float_t*>(inputTensorInfo.data)[i];
+				}
+			} else {
+				for (int32_t i = 0; i < inputTensorInfo.tensorDims.width * inputTensorInfo.tensorDims.height * inputTensorInfo.tensorDims.channel; i++) {
+					tensor->host<uint8_t>()[i] = static_cast<uint8_t*>(inputTensorInfo.data)[i];
+				}
+			}
+			inputTensor->copyFromHostTensor(tensor.get());
 		} else {
 			PRINT_E("Unsupported data type (%d)\n", inputTensorInfo.dataType);
 			return RET_ERR;
@@ -160,11 +202,12 @@ int32_t InferenceHelperMnn::invoke(std::vector<OutputTensorInfo>& outputTensorIn
 		auto dimType = outputTensor->getDimensionType();
 		std::unique_ptr<MNN::Tensor> outputUser(new MNN::Tensor(outputTensor, dimType));
 		outputTensor->copyToHostTensor(outputUser.get());
-		auto size = outputUser->elementSize();
 		auto type = outputUser->getType();
 		if (type.code == halide_type_float) {
+			outputTensorInfo.tensorType = TensorInfo::TENSOR_TYPE_FP32;
 			outputTensorInfo.data = outputUser->host<float_t>();
 		} else if (type.code == halide_type_uint && type.bytes() == 1) {
+			outputTensorInfo.tensorType = TensorInfo::TENSOR_TYPE_UINT8;
 			outputTensorInfo.data = outputUser->host<uint8_t>();
 		} else {
 			PRINT_E("Unexpected data type\n");
@@ -176,7 +219,7 @@ int32_t InferenceHelperMnn::invoke(std::vector<OutputTensorInfo>& outputTensorIn
 		outputTensorInfo.tensorDims.height = (std::max)(outputUser->height(), 1);
 		outputTensorInfo.tensorDims.width = (std::max)(outputUser->width(), 1);
 
-		m_outMatList.push_back(std::move(outputUser));	// store ncnn mat in member variable so that data keep exist
+		m_outMatList.push_back(std::move(outputUser));	// store data in member variable so that data keep exist
 	}
 
 	return RET_OK;

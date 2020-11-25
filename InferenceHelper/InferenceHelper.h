@@ -32,7 +32,7 @@ public:
 
 public:
 	std::string name;			// [In] Set the name of tensor
-	int32_t     id;				// [Out] Do not modify
+	int32_t     id;				// [Out] Do not modify (Used in InferenceHelper)
 	int32_t     tensorType;		// [In] Set the type of tensor (e.g. TENSOR_TYPE_FP32)
 	struct {
 		int32_t batch;   // 0
