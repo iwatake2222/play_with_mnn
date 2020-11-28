@@ -1,28 +1,35 @@
 #include <jni.h>
 #include <string>
+#include <mutex>
 
 #include <opencv2/opencv.hpp>
 #include "ImageProcessor.h"
 
-#define MODEL_FILENAME "/sdcard/models/posenet-mobilenet_v1_075.mnn"
+#define WORK_DIR    "/storage/emulated/0/Android/data/com.iwatake.viewandroidmnn/files/Documents/resource"
+
+static std::mutex g_mtx;
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_iwatake_viewandroid_MainActivity_ImageProcessorInitialize(
+Java_com_iwatake_viewandroidmnn_MainActivity_ImageProcessorInitialize(
         JNIEnv* env,
         jobject /* this */) {
 
+    std::lock_guard<std::mutex> lock(g_mtx);
     int ret = 0;
     INPUT_PARAM inputParam;
-    ret = ImageProcessor_initialize(MODEL_FILENAME, &inputParam);
+    snprintf(inputParam.workDir, sizeof(inputParam.workDir), WORK_DIR);
+    inputParam.numThreads = 2;
+    ret = ImageProcessor_initialize(&inputParam);
     return ret;
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_iwatake_viewandroid_MainActivity_ImageProcessorProcess(
+Java_com_iwatake_viewandroidmnn_MainActivity_ImageProcessorProcess(
         JNIEnv* env,
         jobject, /* this */
         jlong   objMat) {
 
+    std::lock_guard<std::mutex> lock(g_mtx);
     int ret = 0;
     cv::Mat* mat = (cv::Mat*) objMat;
     OUTPUT_PARAM outputParam;
@@ -31,11 +38,25 @@ Java_com_iwatake_viewandroid_MainActivity_ImageProcessorProcess(
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_iwatake_viewandroid_MainActivity_ImageProcessorFinalize(
+Java_com_iwatake_viewandroidmnn_MainActivity_ImageProcessorFinalize(
         JNIEnv* env,
         jobject /* this */) {
 
+    std::lock_guard<std::mutex> lock(g_mtx);
     int ret = 0;
     ret = ImageProcessor_finalize();
     return ret;
 }
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_iwatake_viewandroidmnn_MainActivity_ImageProcessorCommand(
+        JNIEnv* env,
+        jobject, /* this */
+        jint cmd) {
+
+    std::lock_guard<std::mutex> lock(g_mtx);
+    int ret = 0;
+    ret = ImageProcessor_command(cmd);
+    return ret;
+}
+

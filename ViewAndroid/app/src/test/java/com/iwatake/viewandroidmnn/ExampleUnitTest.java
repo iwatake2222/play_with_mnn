@@ -1,4 +1,4 @@
-package com.iwatake.viewandroid;
+package com.iwatake.viewandroidmnn;
 
 import org.junit.Test;
 

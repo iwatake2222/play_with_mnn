@@ -5,7 +5,7 @@ android {
     buildToolsVersion "30.0.0"
 
     defaultConfig {
-        applicationId "com.iwatake.viewandroid"
+        applicationId "com.iwatake.viewandroidmnn"
         minSdkVersion 23
         targetSdkVersion 30
         versionCode 1
