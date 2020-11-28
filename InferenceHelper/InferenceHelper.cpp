@@ -101,7 +101,7 @@ InferenceHelper* InferenceHelper::create(const InferenceHelper::HELPER_TYPE type
 	return p;
 }
 
-#if 1
+#ifdef INFERENCE_HELPER_ENABLE_PRE_PROCESS_BY_OPENCV
 #include <opencv2/opencv.hpp>
 void InferenceHelper::preProcessByOpenCV(const InputTensorInfo& inputTensorInfo, bool isNCHW, cv::Mat& imgBlob)
 {

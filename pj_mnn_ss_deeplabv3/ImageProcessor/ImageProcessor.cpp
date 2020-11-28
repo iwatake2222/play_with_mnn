@@ -1,150 +1,110 @@
 /*** Include ***/
 /* for general */
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdint>
+#include <cstdlib>
+#include <cmath>
+#include <cstring>
 #include <string>
-#include <algorithm>
-#include <fstream>
-#include <functional>
-#include <memory>
-#include <sstream>
 #include <vector>
+#include <array>
+#include <algorithm>
 #include <chrono>
+#include <fstream>
+#include <memory>
 
 /* for OpenCV */
 #include <opencv2/opencv.hpp>
 
-/* for MNN */
-#include <MNN/ImageProcess.hpp>
-#include <MNN/Interpreter.hpp>
-#include <MNN/AutoTime.hpp>
-
+/* for My modules */
+#include "CommonHelper.h"
+#include "SemanticSegmentationEngine.h"
 #include "ImageProcessor.h"
 
 /*** Macro ***/
-#if defined(ANDROID) || defined(__ANDROID__)
-#include <android/log.h>
-#define TAG "MyApp_NDK"
-#define PRINT(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
+#define TAG "ImageProcessor"
+#define PRINT(...)   COMMON_HELPER_PRINT(TAG, __VA_ARGS__)
+#define PRINT_E(...) COMMON_HELPER_PRINT_E(TAG, __VA_ARGS__)
+
+/*** Global variable ***/
+std::unique_ptr<SemanticSegmentationEngine> s_engine;
+
+/*** Function ***/
+static cv::Scalar createCvColor(int32_t b, int32_t g, int32_t r) {
+#ifdef CV_COLOR_IS_RGB
+	return cv::Scalar(r, g, b);
 #else
-#define PRINT(...) printf(__VA_ARGS__)
+	return cv::Scalar(b, g, r);
 #endif
-
-#define CHECK(x)                              \
-  if (!(x)) {                                                \
-	PRINT("Error at %s:%d\n", __FILE__, __LINE__); \
-	exit(1);                                                 \
-  }
-
-/*** Global variables ***/
-static MNN::Interpreter *s_net;
-static MNN::Session* s_session;
-
-/*** Functions ***/
-int ImageProcessor_initialize(const char *modelFilename, INPUT_PARAM *inputParam)
-{
-	/* Create interpreter */
-	s_net = MNN::Interpreter::createFromFile(modelFilename);
-	CHECK(s_net != NULL);
-	MNN::ScheduleConfig scheduleConfig;
-	scheduleConfig.type  = MNN_FORWARD_AUTO;
-	scheduleConfig.numThread = 4;
-	// BackendConfig bnconfig;
-	// bnconfig.precision = BackendConfig::Precision_Low;
-	// config.backendConfig = &bnconfig;
-	s_session = s_net->createSession(scheduleConfig);
-	CHECK(s_session != NULL);
-
-	/* Get model information */
-	auto input = s_net->getSessionInput(s_session, NULL);
-	int modelChannel = input->channel();
-	int modelHeight  = input->height();
-	int modelWidth   = input->width();
-	PRINT("model input size: widgh = %d , height = %d, channel = %d\n", modelWidth, modelHeight, modelChannel);
-
-	return 0;
 }
 
-int ImageProcessor_process(cv::Mat *mat, OUTPUT_PARAM *outputParam)
+
+int32_t ImageProcessor_initialize(const INPUT_PARAM* inputParam)
 {
-	/* Get size information */
-	auto input = s_net->getSessionInput(s_session, NULL);
-	CHECK(input != NULL);
-	int modelChannel = input->channel();
-	int modelHeight = input->height();
-	int modelWidth = input->width();
-	int imageWidth = mat->size[1];
-	int imageHeight = mat->size[0];
-
-	/*** Pre process (resize, colorconversion, normalize) ***/
-	MNN::CV::ImageProcess::Config imageProcessconfig;
-	imageProcessconfig.filterType = MNN::CV::BILINEAR;
-	float mean[3]     = {127.5f, 127.5f, 127.5f};
-	float normals[3] = {0.00785f, 0.00785f, 0.00785f};
-	std::memcpy(imageProcessconfig.mean, mean, sizeof(mean));
-	std::memcpy(imageProcessconfig.normal, normals, sizeof(normals));
-	imageProcessconfig.sourceFormat = MNN::CV::BGR;
-	imageProcessconfig.destFormat   = MNN::CV::BGR;
-
-	MNN::CV::Matrix trans;
-	trans.setScale((float)imageWidth/modelWidth, (float)imageHeight/modelHeight);
-
-	std::shared_ptr<MNN::CV::ImageProcess> pretreat(MNN::CV::ImageProcess::create(imageProcessconfig));
-	pretreat->setMatrix(trans);
-	pretreat->convert((uint8_t*)mat->data, imageWidth, imageHeight, 0, input);
-
-	/*** Inference ***/
-	s_net->runSession(s_session);
-
-	/*** Post process ***/
-	/* Retreive results */
-	auto output = s_net->getSessionOutput(s_session, NULL);
-	CHECK(output != NULL);
-	auto dimType = output->getDimensionType();
-	dimType = MNN::Tensor::TENSORFLOW;
-
-	std::shared_ptr<MNN::Tensor> outputUser(new MNN::Tensor(output, dimType));
-	output->copyToHostTensor(outputUser.get());
-	auto outputWidth = outputUser->shape()[2];
-	auto outputHeight = outputUser->shape()[1];
-	auto outputCannel = outputUser->shape()[3];
-	PRINT("output size: width = %d, height = %d, channel = %d\n", outputWidth, outputHeight, outputCannel);
-
-	auto values = outputUser->host<float>();
-	cv::Mat outputImage = cv::Mat::zeros(outputHeight, outputWidth, CV_8UC3);
-	for (int y = 0; y < outputHeight; y++) {
-		for (int x = 0; x < outputWidth; x++) {
-			int maxChannel = 0;
-			float maxValue = 0;
-			for (int c = 0; c < outputCannel; c++) {
-				float value = values[y * (outputWidth * outputCannel) + x * outputCannel + c];
-				if (value > maxValue) {
-					maxValue = value;
-					maxChannel = c;
-				}
-			}
-
-			float colorRatioB = (maxChannel % 2 + 1) / 2.0f;
-			float colorRatioG = (maxChannel % 3 + 1) / 3.0f;
-			float colorRatioR = (maxChannel % 4 + 1) / 4.0f;
-			outputImage.data[(y * outputWidth + x) * 3 + 0] = (int)(255 * colorRatioB);
-			outputImage.data[(y * outputWidth + x) * 3 + 1] = (int)(255 * colorRatioG);
-			outputImage.data[(y * outputWidth + x) * 3 + 2] = (int)(255 * (1 - colorRatioR));
-
-		}
+	if (s_engine) {
+		PRINT_E("Already initialized\n");
+		return -1;
 	}
 
-	cv::resize(outputImage, outputImage, mat->size());
-	cv::add(*mat, outputImage, *mat);
-
+	s_engine.reset(new SemanticSegmentationEngine());
+	if (s_engine->initialize(inputParam->workDir, inputParam->numThreads) != SemanticSegmentationEngine::RET_OK) {
+		return -1;
+	}
 	return 0;
 }
 
-
-int ImageProcessor_finalize(void)
+int32_t ImageProcessor_finalize(void)
 {
-	s_net->releaseSession(s_session);
-	s_net->releaseModel();
-	delete s_net;
+	if (!s_engine) {
+		PRINT_E("Not initialized\n");
+		return -1;
+	}
+
+	if (s_engine->finalize() != SemanticSegmentationEngine::RET_OK) {
+		return -1;
+	}
+
 	return 0;
 }
+
+
+int32_t ImageProcessor_command(int32_t cmd)
+{
+	if (!s_engine) {
+		PRINT_E("Not initialized\n");
+		return -1;
+	}
+
+	switch (cmd) {
+	case 0:
+	default:
+		PRINT_E("command(%d) is not supported\n", cmd);
+		return -1;
+	}
+}
+
+
+int32_t ImageProcessor_process(cv::Mat* mat, OUTPUT_PARAM* outputParam)
+{
+	if (!s_engine) {
+		PRINT_E("Not initialized\n");
+		return -1;
+	}
+
+	const cv::Mat originalMat = *mat;
+	SemanticSegmentationEngine::RESULT result;
+	if (s_engine->invoke(originalMat, result) != SemanticSegmentationEngine::RET_OK) {
+		return -1;
+	}
+
+	/* Draw the result */
+	cv::resize(result.maskImage, result.maskImage, originalMat.size());
+	cv::add(originalMat, result.maskImage, originalMat);
+
+	/* Return the results */
+	outputParam->timePreProcess = result.timePreProcess;
+	outputParam->timeInference = result.timeInference;
+	outputParam->timePostProcess = result.timePostProcess;
+
+	return 0;
+}
+

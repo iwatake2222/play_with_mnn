@@ -1,56 +1,71 @@
 /*** Include ***/
 /* for general */
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdint>
+#include <cstdlib>
+#include <cmath>
+#include <cstring>
 #include <string>
 #include <vector>
+#include <array>
 #include <algorithm>
 #include <chrono>
 
 /* for OpenCV */
 #include <opencv2/opencv.hpp>
 
+/* for My modules */
 #include "ImageProcessor.h"
 
 /*** Macro ***/
-/* Model parameters */
-#define MODEL_NAME   RESOURCE_DIR"/model/deeplabv3_257_mv_gpu.mnn"
-#define IMAGE_NAME   RESOURCE_DIR"/cat.jpg"
-
-/* Settings */
-// #define TEST_SPEED_ONLY
+#define IMAGE_NAME   RESOURCE_DIR"/ZOM93_minatomirainodate20140503_TP_V4.jpg"
+#define WORK_DIR     RESOURCE_DIR
 #define LOOP_NUM_FOR_TIME_MEASUREMENT 10
 
-int main(int argc, const char* argv[])
+
+int32_t main()
 {
+	/*** Initialize ***/
 	/* Initialize image processor library */
 	INPUT_PARAM inputParam;
-	ImageProcessor_initialize(MODEL_NAME, &inputParam);
+	snprintf(inputParam.workDir, sizeof(inputParam.workDir), WORK_DIR);
+	inputParam.numThreads = 4;
+	ImageProcessor_initialize(&inputParam);
 
-#ifdef TEST_SPEED_ONLY
+#ifdef SPEED_TEST_ONLY
 	/* Read an input image */
 	cv::Mat originalImage = cv::imread(IMAGE_NAME);
+	cv::Mat imgForSpeedTest = originalImage.clone();
 
 	/* Call image processor library */
 	OUTPUT_PARAM outputParam;
 	ImageProcessor_process(&originalImage, &outputParam);
 
 	cv::imshow("originalImage", originalImage);
+	cv::waitKey(1);
 
 	/*** (Optional) Measure inference time ***/
+	double_t timePreProcess = 0;
+	double_t timeInference = 0;
+	double_t timePostProcess = 0;
 	const auto& t0 = std::chrono::steady_clock::now();
-	for (int i = 0; i < LOOP_NUM_FOR_TIME_MEASUREMENT; i++) {
-		ImageProcessor_process(&originalImage, &outputParam);
+	for (int32_t i = 0; i < LOOP_NUM_FOR_TIME_MEASUREMENT; i++) {
+		ImageProcessor_process(&imgForSpeedTest, &outputParam);
+		timePreProcess += outputParam.timePreProcess;
+		timeInference += outputParam.timeInference;
+		timePostProcess += outputParam.timePostProcess;
 	}
 	const auto& t1 = std::chrono::steady_clock::now();
-	std::chrono::duration<double> timeSpan = t1 - t0;
-	printf("Inference time = %f [msec]\n", timeSpan.count() * 1000.0 / LOOP_NUM_FOR_TIME_MEASUREMENT);
+	std::chrono::duration<double_t> timeSpan = t1 - t0;
+	printf("PreProcessing time  = %.3lf [msec]\n", timePreProcess / LOOP_NUM_FOR_TIME_MEASUREMENT);
+	printf("Inference time  = %.3lf [msec]\n", timeInference / LOOP_NUM_FOR_TIME_MEASUREMENT);
+	printf("PostProcessing time  = %.3lf [msec]\n", timePostProcess / LOOP_NUM_FOR_TIME_MEASUREMENT);
+	printf("Total Image processing time  = %.3lf [msec]\n", timeSpan.count() * 1000.0 / LOOP_NUM_FOR_TIME_MEASUREMENT);
 	cv::waitKey(-1);
 
 #else
 	/* Initialize camera */
-	int originalImageWidth = 640;
-	int originalImageHeight = 480;
+	int32_t originalImageWidth = 640;
+	int32_t originalImageHeight = 480;
 
 	static cv::VideoCapture cap;
 	cap = cv::VideoCapture(0);

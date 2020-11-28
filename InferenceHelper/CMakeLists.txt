@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.0)
 
 set(LibraryName "InferenceHelper")
 
+set(INFERENCE_HELPER_ENABLE_PRE_PROCESS_BY_OPENCV on CACHE BOOL "Enable PreProcess by OpenCV? [on/off]")
 set(INFERENCE_HELPER_ENABLE_OPENCV on CACHE BOOL "With OpenCV? [on/off]")
 set(INFERENCE_HELPER_ENABLE_TENSORRT off CACHE BOOL "With TensorRT? [on/off]")
 set(INFERENCE_HELPER_ENABLE_TFLITE off CACHE BOOL "With Tflite? [on/off]")
@@ -32,13 +33,16 @@ if(INFERENCE_HELPER_ENABLE_MNN)
 endif()
 add_library(${LibraryName} ${SRC})
 
-# For TensorInfo (Pre process calculation)
-find_package(OpenCV REQUIRED)
-target_include_directories(${LibraryName} PUBLIC ${OpenCV_INCLUDE_DIRS})
-target_link_libraries(${LibraryName} ${OpenCV_LIBS})
 target_include_directories(${LibraryName} PUBLIC ../CommonHelper)
 target_link_libraries(${LibraryName} CommonHelper)
 
+# For TensorInfo (Pre process calculation)
+if(INFERENCE_HELPER_ENABLE_PRE_PROCESS_BY_OPENCV)
+	find_package(OpenCV REQUIRED)
+	target_include_directories(${LibraryName} PUBLIC ${OpenCV_INCLUDE_DIRS})
+	target_link_libraries(${LibraryName} ${OpenCV_LIBS})
+	add_definitions(-DINFERENCE_HELPER_ENABLE_PRE_PROCESS_BY_OPENCV)
+endif()
 
 # For OpenCV
 if(INFERENCE_HELPER_ENABLE_OPENCV)
