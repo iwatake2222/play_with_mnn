@@ -26,7 +26,6 @@
 
 /* Model parameters */
 #define MODEL_NAME   "deeplabv3_257_mv_gpu.mnn"
-#define LABEL_NAME   "imagenet_labels.txt"
 
 
 /*** Function ***/
@@ -34,7 +33,6 @@ int32_t SemanticSegmentationEngine::initialize(const std::string& workDir, const
 {
 	/* Set model information */
 	std::string modelFilename = workDir + "/model/" + MODEL_NAME;
-	std::string labelFilename = workDir + "/model/" + LABEL_NAME;
 
 	/* Set input tensor info */
 	m_inputTensorList.clear();
@@ -103,11 +101,6 @@ int32_t SemanticSegmentationEngine::initialize(const std::string& workDir, const
 	}
 	if (m_inferenceHelper->initialize(modelFilename, m_inputTensorList, m_outputTensorList) != InferenceHelper::RET_OK) {
 		m_inferenceHelper.reset();
-		return RET_ERR;
-	}
-
-	/* read label */
-	if (readLabel(labelFilename, m_labelList) != RET_OK) {
 		return RET_ERR;
 	}
 
@@ -223,21 +216,5 @@ int32_t SemanticSegmentationEngine::invoke(const cv::Mat& originalMat, RESULT& r
 	result.timeInference = static_cast<std::chrono::duration<double_t>>(tInference1 - tInference0).count() * 1000.0;
 	result.timePostProcess = static_cast<std::chrono::duration<double_t>>(tPostProcess1 - tPostProcess0).count() * 1000.0;;
 
-	return RET_OK;
-}
-
-
-int32_t SemanticSegmentationEngine::readLabel(const std::string& filename, std::vector<std::string>& labelList)
-{
-	std::ifstream ifs(filename);
-	if (ifs.fail()) {
-		PRINT_E("Failed to read %s\n", filename.c_str());
-		return RET_ERR;
-	}
-	labelList.clear();
-	std::string str;
-	while (getline(ifs, str)) {
-		labelList.push_back(str);
-	}
 	return RET_OK;
 }

@@ -121,7 +121,7 @@ public:
 			}
 			return m_dataFp32;
 		} else if (tensorType == TENSOR_TYPE_FP32) {
-			return (float_t*)data;
+			return (const float_t*)data;
 		} else {
 			return nullptr;
 		}

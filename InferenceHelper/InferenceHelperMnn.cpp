@@ -82,11 +82,17 @@ int32_t InferenceHelperMnn::initialize(const std::string& modelFilename, std::ve
 			PRINT_E("Incorrect input tensor type (%d, %d)\n", inputTensor->getType().code, inputTensorInfo.tensorType);
 			return RET_ERR;
 		}
-		if ((inputTensor->channel() == inputTensorInfo.tensorDims.channel) && (inputTensor->height() == inputTensorInfo.tensorDims.height) && (inputTensor->width() == inputTensorInfo.tensorDims.width)) {
-			/* OK */
+		if ((inputTensor->channel() != -1) && (inputTensor->height() != -1) && (inputTensor->width() != -1)) {
+			if ((inputTensor->channel() == inputTensorInfo.tensorDims.channel) && (inputTensor->height() == inputTensorInfo.tensorDims.height) && (inputTensor->width() == inputTensorInfo.tensorDims.width)) {
+				/* OK */
+			} else {
+				PRINT_E("Incorrect input tensor size\n");
+				return RET_ERR;
+			}
 		} else {
-			PRINT_E("Incorrect input tensor size\n");
-			return RET_ERR;
+			/* In case the input size  is not fixed */
+			m_net->resizeTensor(inputTensor, { 1, inputTensorInfo.tensorDims.channel, inputTensorInfo.tensorDims.height, inputTensorInfo.tensorDims.width });
+			m_net->resizeSession(m_session);
 		}
 	}
 	for (const auto& outputTensorInfo : outputTensorInfoList) {
@@ -218,7 +224,6 @@ int32_t InferenceHelperMnn::invoke(std::vector<OutputTensorInfo>& outputTensorIn
 		outputTensorInfo.tensorDims.channel = (std::max)(outputUser->channel(), 1);
 		outputTensorInfo.tensorDims.height = (std::max)(outputUser->height(), 1);
 		outputTensorInfo.tensorDims.width = (std::max)(outputUser->width(), 1);
-
 		m_outMatList.push_back(std::move(outputUser));	// store data in member variable so that data keep exist
 	}
 
