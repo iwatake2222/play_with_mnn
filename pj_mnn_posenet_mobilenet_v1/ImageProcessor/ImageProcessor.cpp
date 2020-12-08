@@ -90,7 +90,7 @@ int32_t ImageProcessor_process(cv::Mat* mat, OUTPUT_PARAM* outputParam)
 		return -1;
 	}
 
-	const cv::Mat originalMat = *mat;
+	cv::Mat& originalMat = *mat;
 	PoseEngine::RESULT result;
 	if (s_engine->invoke(originalMat, result) != PoseEngine::RET_OK) {
 		return -1;

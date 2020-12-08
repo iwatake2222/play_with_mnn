@@ -23,13 +23,15 @@ public:
 		RET_ERR = -1,
 	};
 
-	typedef struct {
-		std::vector<float_t>                                  poseScores;			// [body]
-		std::vector<std::vector<float_t>>                     poseKeypointScores;	// [body][part]
-		std::vector<std::vector<std::pair<float_t, float_t>>> poseKeypointCoords;	// [body][part][x, y]
-		double_t    timePreProcess;		// [msec]
-		double_t    timeInference;		// [msec]
-		double_t    timePostProcess;	// [msec]
+	typedef struct RESULT_ {
+		std::vector<float>                                  poseScores;			// [body]
+		std::vector<std::vector<float>>                     poseKeypointScores;	// [body][part]
+		std::vector<std::vector<std::pair<float, float>>> poseKeypointCoords;	// [body][part][x, y]
+		double    timePreProcess;		// [msec]
+		double    timeInference;		// [msec]
+		double    timePostProcess;	// [msec]
+		RESULT_() : timePreProcess(0), timeInference(0), timePostProcess(0)
+		{}
 	} RESULT;
 
 public:
