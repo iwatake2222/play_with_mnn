@@ -45,47 +45,20 @@ int32_t ClassificationEngine::initialize(const std::string& workDir, const int32
 	inputTensorInfo.tensorDims.width = 224;
 	inputTensorInfo.tensorDims.height = 224;
 	inputTensorInfo.tensorDims.channel = 3;
-	inputTensorInfo.data = nullptr;
 	inputTensorInfo.dataType = InputTensorInfo::DATA_TYPE_IMAGE;
-	inputTensorInfo.imageInfo.width = -1;
-	inputTensorInfo.imageInfo.height = -1;
-	inputTensorInfo.imageInfo.channel = -1;
-	inputTensorInfo.imageInfo.cropX = -1;
-	inputTensorInfo.imageInfo.cropY = -1;
-	inputTensorInfo.imageInfo.cropWidth = -1;
-	inputTensorInfo.imageInfo.cropHeight = -1;
-	inputTensorInfo.imageInfo.isBGR = true;
-	inputTensorInfo.imageInfo.swapColor = false;
 	inputTensorInfo.normalize.mean[0] = 0.485f;   	/* https://github.com/onnx/models/tree/master/vision/classification/mobilenet#preprocessing */
 	inputTensorInfo.normalize.mean[1] = 0.456f;
 	inputTensorInfo.normalize.mean[2] = 0.406f;
 	inputTensorInfo.normalize.norm[0] = 0.229f;
 	inputTensorInfo.normalize.norm[1] = 0.224f;
 	inputTensorInfo.normalize.norm[2] = 0.225f;
-#if 0
-	/* Convert to speeden up normalization:  ((src / 255) - mean) / norm  = src * 1 / (255 * norm) - (mean / norm) */
-	for (int32_t i = 0; i < 3; i++) {
-		inputTensorInfo.normalize.mean[i] /= inputTensorInfo.normalize.norm[i];
-		inputTensorInfo.normalize.norm[i] *= 255.0f;
-		inputTensorInfo.normalize.norm[i] = 1.0f / inputTensorInfo.normalize.norm[i];
-	}
-#endif
-#if 1
-	/* Convert to speeden up normalization:  ((src / 255) - mean) / norm = (src  - (mean * 255))  * (1 / (255 * norm)) */
-	for (int32_t i = 0; i < 3; i++) {
-		inputTensorInfo.normalize.mean[i] *= 255.0f;
-		inputTensorInfo.normalize.norm[i] *= 255.0f;
-		inputTensorInfo.normalize.norm[i] = 1.0f / inputTensorInfo.normalize.norm[i];
-	}
-#endif
-
 	m_inputTensorList.push_back(inputTensorInfo);
 
 	/* Set output tensor info */
 	m_outputTensorList.clear();
 	OutputTensorInfo outputTensorInfo;
-	outputTensorInfo.name = "MobilenetV2/Predictions/Reshape_1";
 	outputTensorInfo.tensorType = TensorInfo::TENSOR_TYPE_FP32;
+	outputTensorInfo.name = "MobilenetV2/Predictions/Reshape_1";
 	m_outputTensorList.push_back(outputTensorInfo);
 
 	/* Create and Initialize Inference Helper */
@@ -93,6 +66,10 @@ int32_t ClassificationEngine::initialize(const std::string& workDir, const int32
 	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSOR_RT));
 	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::NCNN));
 	m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::MNN));
+	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE));
+	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_EDGETPU));
+	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_GPU));
+	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_XNNPACK));
 
 	if (!m_inferenceHelper) {
 		return RET_ERR;
@@ -104,6 +81,15 @@ int32_t ClassificationEngine::initialize(const std::string& workDir, const int32
 	if (m_inferenceHelper->initialize(modelFilename, m_inputTensorList, m_outputTensorList) != InferenceHelper::RET_OK) {
 		m_inferenceHelper.reset();
 		return RET_ERR;
+	}
+
+	/* Check if input tensor info is set */
+	for (const auto& inputTensorInfo : m_inputTensorList) {
+		if ((inputTensorInfo.tensorDims.width <= 0) || (inputTensorInfo.tensorDims.height <= 0) || inputTensorInfo.tensorType == TensorInfo::TENSOR_TYPE_NONE) {
+			PRINT_E("Invalid tensor size\n");
+			m_inferenceHelper.reset();
+			return RET_ERR;
+		}
 	}
 
 	/* read label */
@@ -139,9 +125,9 @@ int32_t ClassificationEngine::invoke(const cv::Mat& originalMat, RESULT& result)
 	/* do resize and color conversion here because some inference engine doesn't support these operations */
 	cv::Mat imgSrc;
 	cv::resize(originalMat, imgSrc, cv::Size(inputTensorInfo.tensorDims.width, inputTensorInfo.tensorDims.height));
-	if (inputTensorInfo.imageInfo.channel == 3 && inputTensorInfo.imageInfo.swapColor) {
-		cv::cvtColor(imgSrc, imgSrc, cv::COLOR_BGR2RGB);
-	}
+#ifndef CV_COLOR_IS_RGB
+	cv::cvtColor(imgSrc, imgSrc, cv::COLOR_BGR2RGB);
+#endif
 	inputTensorInfo.data = imgSrc.data;
 	inputTensorInfo.dataType = InputTensorInfo::DATA_TYPE_IMAGE;
 	inputTensorInfo.imageInfo.width = imgSrc.cols;
@@ -151,7 +137,7 @@ int32_t ClassificationEngine::invoke(const cv::Mat& originalMat, RESULT& result)
 	inputTensorInfo.imageInfo.cropY = 0;
 	inputTensorInfo.imageInfo.cropWidth = imgSrc.cols;
 	inputTensorInfo.imageInfo.cropHeight = imgSrc.rows;
-	inputTensorInfo.imageInfo.isBGR = true;
+	inputTensorInfo.imageInfo.isBGR = false;
 	inputTensorInfo.imageInfo.swapColor = false;
 #else
 	/* Test other input format */
@@ -167,11 +153,14 @@ int32_t ClassificationEngine::invoke(const cv::Mat& originalMat, RESULT& result)
 	inputTensorInfo.imageInfo.cropHeight = originalMat.rows;
 	inputTensorInfo.imageInfo.isBGR = true;
 	inputTensorInfo.imageInfo.swapColor = true;
-	//InferenceHelper::preProcessByOpenCV(inputTensorInfo, false, imgSrc);
+#if 0
+	InferenceHelper::preProcessByOpenCV(inputTensorInfo, false, imgSrc);
+	inputTensorInfo.dataType = InputTensorInfo::DATA_TYPE_BLOB_NHWC;
+#else
 	InferenceHelper::preProcessByOpenCV(inputTensorInfo, true, imgSrc);
-	inputTensorInfo.data = imgSrc.data;
-	//inputTensorInfo.dataType = InputTensorInfo::DATA_TYPE_BLOB_NHWC;
 	inputTensorInfo.dataType = InputTensorInfo::DATA_TYPE_BLOB_NCHW;
+#endif
+	inputTensorInfo.data = imgSrc.data;
 #endif
 	if (m_inferenceHelper->preProcess(m_inputTensorList) != InferenceHelper::RET_OK) {
 		return RET_ERR;
@@ -221,6 +210,9 @@ int32_t ClassificationEngine::readLabel(const std::string& filename, std::vector
 		return RET_ERR;
 	}
 	labelList.clear();
+	if (WITH_BACKGROUND) {
+		labelList.push_back("background");
+	}
 	std::string str;
 	while (getline(ifs, str)) {
 		labelList.push_back(str);
