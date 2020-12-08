@@ -71,26 +71,26 @@ inline float clip(float value, float min, float max) {
 	}
 }
 
-static std::pair<float_t,float_t> getCoordsFromTensor(const OutputTensorInfo& dataTensor, int id, int x, int y, bool getCoord = true) {
+static std::pair<float,float> getCoordsFromTensor(const OutputTensorInfo& dataTensor, int id, int x, int y, bool getCoord = true) {
 	// dataTensor must be [1,c,h,w]
 	auto dataPtr = (float*)dataTensor.data;
 	const int xOffset = dataTensor.tensorDims.channel / 2;
 	const int indexPlane = y * dataTensor.tensorDims.width + x;
 	const int indexY = id * dataTensor.tensorDims.width * dataTensor.tensorDims.height + indexPlane;
 	const int indexX = (id + xOffset) * dataTensor.tensorDims.width * dataTensor.tensorDims.height + indexPlane;
-	std::pair<float_t,float_t> point;
+	std::pair<float,float> point;
 	if (getCoord) {
-		point = std::pair<float_t, float_t>(dataPtr[indexX], dataPtr[indexY]);
+		point = std::pair<float, float>(dataPtr[indexX], dataPtr[indexY]);
 	} else {
-		point = std::pair<float_t, float_t>(0.0f, dataPtr[indexY]);
+		point = std::pair<float, float>(0.0f, dataPtr[indexY]);
 	}
 	return point;
 };
 
 // decode pose and posenet model reference from https://github.com/rwightman/posenet-python
-static int decodePoseImpl(float curScore, int curId, const std::pair<float_t,float_t>& originalOnImageCoords, const OutputTensorInfo& heatmaps,
+static int decodePoseImpl(float curScore, int curId, const std::pair<float,float>& originalOnImageCoords, const OutputTensorInfo& heatmaps,
 	const OutputTensorInfo& offsets, const OutputTensorInfo& displacementFwd, const OutputTensorInfo& displacementBwd,
-	std::vector<float>& instanceKeypointScores, std::vector<std::pair<float_t,float_t>>& instanceKeypointCoords) {
+	std::vector<float>& instanceKeypointScores, std::vector<std::pair<float,float>>& instanceKeypointCoords) {
 	instanceKeypointScores[curId] = curScore;
 	instanceKeypointCoords[curId] = originalOnImageCoords;
 	const int height = heatmaps.tensorDims.height;
@@ -100,7 +100,7 @@ static int decodePoseImpl(float curScore, int curId, const std::pair<float_t,flo
 		poseNamesID[PoseNames[i]] = i;
 	}
 
-	auto traverseToTargetKeypoint = [=](int edgeId, const std::pair<float_t,float_t>& sourcekeypointCoord, int targetKeypointId,
+	auto traverseToTargetKeypoint = [=](int edgeId, const std::pair<float,float>& sourcekeypointCoord, int targetKeypointId,
 		const OutputTensorInfo& displacement) {
 		int sourceKeypointIndicesX =
 			static_cast<int>(clip(round(sourcekeypointCoord.first / (float)OUTPUT_STRIDE), 0, (float)(width - 1)));
@@ -121,7 +121,7 @@ static int decodePoseImpl(float curScore, int curId, const std::pair<float_t,flo
 			getCoordsFromTensor(heatmaps, targetKeypointId, displacedPointIndicesX, displacedPointIndicesY, false).second;
 		auto offset = getCoordsFromTensor(offsets, targetKeypointId, displacedPointIndicesX, displacedPointIndicesY);
 
-		std::pair<float_t,float_t> imageCoord;
+		std::pair<float,float> imageCoord;
 		imageCoord.first = displacedPointIndicesX * OUTPUT_STRIDE + offset.first;
 		imageCoord.second = displacedPointIndicesY * OUTPUT_STRIDE + offset.second;
 
@@ -157,9 +157,9 @@ static int decodePoseImpl(float curScore, int curId, const std::pair<float_t,flo
 static int decodeMultiPose(const OutputTensorInfo& offsets, const OutputTensorInfo& displacementFwd, const OutputTensorInfo& displacementBwd, const OutputTensorInfo& heatmaps, 
 	std::vector<float>& poseScores,
 	std::vector<std::vector<float>>& poseKeypointScores,
-	std::vector<std::vector<std::pair<float_t,float_t>>>& poseKeypointCoords) {
+	std::vector<std::vector<std::pair<float,float>>>& poseKeypointCoords) {
 	// keypoint_id, score, coord((x,y))
-	typedef std::pair<int, std::pair<float, std::pair<float_t,float_t>>> partsType;
+	typedef std::pair<int, std::pair<float, std::pair<float,float>>> partsType;
 	std::vector<partsType> parts;
 
 	const int channel = heatmaps.tensorDims.channel;
@@ -189,14 +189,14 @@ static int decodeMultiPose(const OutputTensorInfo& offsets, const OutputTensorIn
 				}
 
 				if (isMaxVaule && maxValue >= SCORE_THRESHOLD) {
-					std::pair<float_t,float_t> coord((float_t)x, (float_t)y);
+					std::pair<float,float> coord((float)x, (float)y);
 					parts.push_back(std::make_pair(id, std::make_pair(maxValue, coord)));
 				}
 			}
 		}
 	};
 
-	float_t* scoresPtr = static_cast< float_t*>(heatmaps.data);
+	float* scoresPtr = static_cast< float*>(heatmaps.data);
 
 	for (int id = 0; id < channel; ++id) {
 		auto idScoresPtr = scoresPtr + id * width * height;
@@ -209,7 +209,7 @@ static int decodeMultiPose(const OutputTensorInfo& offsets, const OutputTensorIn
 
 	const int squareNMSRadius = NMS_RADIUS * NMS_RADIUS;
 
-	auto withinNMSRadius = [=, &poseKeypointCoords](const std::pair<float_t,float_t>& point, const int id) {
+	auto withinNMSRadius = [=, &poseKeypointCoords](const std::pair<float,float>& point, const int id) {
 		bool withinThisPointRadius = false;
 		for (int i = 0; i < poseKeypointCoords.size(); ++i) {
 			const auto& curPoint = poseKeypointCoords[i][id];
@@ -223,7 +223,7 @@ static int decodeMultiPose(const OutputTensorInfo& offsets, const OutputTensorIn
 	};
 
 	std::vector<float> instanceKeypointScores(NUM_KEYPOINTS);
-	std::vector<std::pair<float_t,float_t>> instanceKeypointCoords(NUM_KEYPOINTS);
+	std::vector<std::pair<float,float>> instanceKeypointCoords(NUM_KEYPOINTS);
 
 	auto getInstanceScore = [&]() {
 		float notOverlappedScores = 0.0f;
@@ -253,7 +253,7 @@ static int decodeMultiPose(const OutputTensorInfo& offsets, const OutputTensorIn
 		const auto& curPoint = part.second.second;
 
 		const auto offsetXY = getCoordsFromTensor(offsets, curId, (int)curPoint.first, (int)curPoint.second);
-		std::pair<float_t,float_t> originalOnImageCoords;
+		std::pair<float,float> originalOnImageCoords;
 		originalOnImageCoords.first = curPoint.first * OUTPUT_STRIDE + offsetXY.first;
 		originalOnImageCoords.second = curPoint.second * OUTPUT_STRIDE + offsetXY.second;
 
@@ -261,7 +261,7 @@ static int decodeMultiPose(const OutputTensorInfo& offsets, const OutputTensorIn
 			continue;
 		}
 		::memset(instanceKeypointScores.data(), 0, sizeof(float) * NUM_KEYPOINTS);
-		::memset(instanceKeypointCoords.data(), 0, sizeof(std::pair<float_t,float_t>) * NUM_KEYPOINTS);
+		::memset(instanceKeypointCoords.data(), 0, sizeof(std::pair<float,float>) * NUM_KEYPOINTS);
 		decodePoseImpl(curScore, curId, originalOnImageCoords, heatmaps, offsets, displacementFwd, displacementBwd,
 			instanceKeypointScores, instanceKeypointCoords);
 
@@ -293,8 +293,8 @@ int32_t PoseEngine::initialize(const std::string& workDir, const int32_t numThre
 	inputTensorInfo.name = "image";
 	inputTensorInfo.tensorType = TensorInfo::TENSOR_TYPE_FP32;
 	inputTensorInfo.tensorDims.batch = 1;
-	inputTensorInfo.tensorDims.width = static_cast<int32_t>((float_t)MODEL_WIDTH / (float_t)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1;
-	inputTensorInfo.tensorDims.height = static_cast<int32_t>((float_t)MODEL_HEIGHT / (float_t)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1;
+	inputTensorInfo.tensorDims.width = static_cast<int32_t>((float)MODEL_WIDTH / (float)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1;
+	inputTensorInfo.tensorDims.height = static_cast<int32_t>((float)MODEL_HEIGHT / (float)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1;
 	inputTensorInfo.tensorDims.channel = 3;
 	inputTensorInfo.dataType = InputTensorInfo::DATA_TYPE_IMAGE;
 	inputTensorInfo.normalize.mean[0] = 0.5f;   	/* https://github.com/alibaba/MNN/blob/master/demo/exec/multiPose.cpp#L343 */
@@ -403,13 +403,13 @@ int32_t PoseEngine::invoke(const cv::Mat& originalMat, RESULT& result)
 
 	/*** PostProcess ***/
 	const auto& tPostProcess0 = std::chrono::steady_clock::now();
-	std::vector<float_t> poseScores;
-	std::vector<std::vector<float_t>> poseKeypointScores;
-	std::vector<std::vector<std::pair<float_t,float_t>>> poseKeypointCoords;	// x, y
+	std::vector<float> poseScores;
+	std::vector<std::vector<float>> poseKeypointScores;
+	std::vector<std::vector<std::pair<float,float>>> poseKeypointCoords;	// x, y
 	decodeMultiPose(m_outputTensorList[0], m_outputTensorList[1], m_outputTensorList[2], m_outputTensorList[3], poseScores, poseKeypointScores, poseKeypointCoords);
 
-	float_t scaleX = static_cast<float_t>(originalMat.cols) / inputTensorInfo.tensorDims.width;
-	float_t scaleY = static_cast<float_t>(originalMat.rows) / inputTensorInfo.tensorDims.height;
+	float scaleX = static_cast<float>(originalMat.cols) / inputTensorInfo.tensorDims.width;
+	float scaleY = static_cast<float>(originalMat.rows) / inputTensorInfo.tensorDims.height;
 	for (int32_t i = 0; i < poseScores.size(); ++i) {
 		for (int32_t id = 0; id < NUM_KEYPOINTS; ++id) {
 			poseKeypointCoords[i][id].first *= scaleX;
@@ -422,9 +422,9 @@ int32_t PoseEngine::invoke(const cv::Mat& originalMat, RESULT& result)
 	result.poseScores = poseScores;
 	result.poseKeypointScores = poseKeypointScores;
 	result.poseKeypointCoords = poseKeypointCoords;
-	result.timePreProcess = static_cast<std::chrono::duration<double_t>>(tPreProcess1 - tPreProcess0).count() * 1000.0;
-	result.timeInference = static_cast<std::chrono::duration<double_t>>(tInference1 - tInference0).count() * 1000.0;
-	result.timePostProcess = static_cast<std::chrono::duration<double_t>>(tPostProcess1 - tPostProcess0).count() * 1000.0;;
+	result.timePreProcess = static_cast<std::chrono::duration<double>>(tPreProcess1 - tPreProcess0).count() * 1000.0;
+	result.timeInference = static_cast<std::chrono::duration<double>>(tInference1 - tInference0).count() * 1000.0;
+	result.timePostProcess = static_cast<std::chrono::duration<double>>(tPostProcess1 - tPostProcess0).count() * 1000.0;;
 
 	return RET_OK;
 }
