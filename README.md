@@ -4,19 +4,20 @@
 Sample projects to use MNN (https://github.com/alibaba/MNN )
 
 ## Target environment
-- Windows(MSVC) (x64)
+- Windows(MSVC2017) (x64)
 - Linux (x64)
 - Linux (armv7) e.g. Raspberry Pi 3,4
 - Linux (aarch64) e.g. Jetson Nano
 - *Native build only (Cross build is not supported)
 
-
 ## How to build application code
-```
-cd play_with_mnn
-git submodule init
-git submodule update
+### Preparation
+- Please download the following files from `Releases` in GitHub, and extract them to the same name directory
+	- third_party.zip
+	- resource.zip
 
+### Linux
+```
 cd pj_mnn_cls_mobilenet_v2
 mkdir build && cd build
 cmake ..
@@ -49,22 +50,17 @@ pre-built MNN library is stored in third_party/MNN_prebuilt . Please use the fol
 
 
 ### Linux
-```
-cd third_party/MNN/schema
-./generate.sh
-cd ../../../
-
-cd pj_mnn_cls_mobilenet_v2
-mkdir build && cd build
-cmake .. -DUSE_PREBUILT_MNN=off
-make
-
-./main
-```
-
-### Android
 Follow the instruction (https://www.yuque.com/mnn/en/build_android ).
 
+- Native build
+```
+cd /path/to/MNN
+./schema/generate.sh
+mkdir build && cd build
+cmake -DCMAKE_INSTALL_PREFIX=./ .. && make -j4 && make install
+```
+
+- Android
 ```
 export ANDROID_NDK=/path/to/android-ndk
 cd /path/to/MNN
@@ -75,9 +71,9 @@ mkdir build_64 && cd build_64 && ../build_64.sh
 ```
 
 ### Windows (Visual Studio)
-- Build `third_party\MNN\3rd_party\flatbuffers` in Visual Studio (use cmake-gui)
+- Build `MNN\3rd_party\flatbuffers` in Visual Studio (use cmake-gui)
 - Copy flatc.exe to any place (Prebuilt executable file is stored in `play_with_mnn\third_party\MNN_prebuilt\tools\x64_windows\flatc.exe`
-- Modify `play_with_mnn\third_party\MNN\schema\generate.ps1` not to build flatc.exe and use the created flatc.exe
+- Modify `MNN\schema\generate.ps1` not to build flatc.exe and use the created flatc.exe
 	```
 	+++ b/schema/generate.ps1
 	@@ -9,7 +9,7 @@ if (($args[0] -eq "-lazy") -and ( Test-Path "current" -PathType Container )) {
@@ -114,7 +110,7 @@ mkdir build_64 && cd build_64 && ../build_64.sh
 	cd ~/
 	git clone https://github.com/protocolbuffers/protobuf.git
 	cd protobuf
-	git checkout  v3.7.1
+	git checkout v3.14.0
 	./autogen.sh
 	./configure CXXFLAGS="-fPIC" --prefix=/usr/local --disable-shared 2>&1 > /dev/null
 	make -j2
@@ -122,8 +118,7 @@ mkdir build_64 && cd build_64 && ../build_64.sh
 	sudo ldconfig
 	```
 - Build MNN with the following option
-	- `cmake .. -DUSE_PREBUILT_MNN=off -DMNN_BUILD_QUANTOOLS=on -DMNN_BUILD_CONVERTER=on `
-- (in my environment, the converter with `-DMNN_BUILD_SHARED_LIBS=off` causes segmentation fault...)
+	- `cmake .. -DMNN_BUILD_QUANTOOLS=on -DMNN_BUILD_CONVERTER=on -DMNN_BUILD_SHARED_LIBS=off`
 
 ### Windows(Visual Studio)
 - Install protobuf
@@ -131,18 +126,19 @@ mkdir build_64 && cd build_64 && ../build_64.sh
 	cd ~/
 	git clone https://github.com/protocolbuffers/protobuf.git
 	cd protobuf
-	git checkout  v3.7.1
+	git checkout v3.14.0
 	```
 	- Create a Visual Studio project for protobuf usin cmake-gui
 	- Build protobuf and install
-		- Set Runtime library in Code Generation in property as Multithread (/MT)
+		- Set Runtime library in Code Generation in property as Multithread DLL (/MD) (use the same setting as MNN)
+		- Or, change the setting in MNN to use the same setting as protobuf (probably, using /MT is better)
 - Create a Visual Studio project for MNN using cmake-gui
 	- MNN_BUILD_SHARED_LIBS=off
 	- MNN_BUILD_QUANTOOLS=on
 	- MNN_BUILD_CONVERTER=on
 	- Fill out protobuflib settings
-		
-		![protobuflib](00_doc/windows_tool.png) 
+	
+	![protobuflib](00_doc/windows_tool.png) 
 - Build the project in Visual Studio
 
 # Acknowledgements
