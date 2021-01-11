@@ -4,17 +4,34 @@
 Sample projects to use MNN (https://github.com/alibaba/MNN )
 
 ## Target environment
-- Windows(MSVC2017) (x64)
-- Linux (x64)
-- Linux (armv7) e.g. Raspberry Pi 3,4
-- Linux (aarch64) e.g. Jetson Nano
-- *Native build only (Cross build is not supported)
+- Platform
+	- Linux (x64)
+		- Tested in Xubuntu 18 in VirtualBox in Windows 10
+	- Linux (armv7)
+		- Tested in Raspberry Pi4 (Raspbian 32-bit)
+	- Linux (aarch64)
+		- Tested in Jetson Nano (JetPack 4.3) and Jetson NX (JetPack 4.4)
+	- Android (aarch64)
+		- Tested in Pixel 4a
+	- Windows (x64). Visual Studio 2017, 2019
+		- Tested in Windows10 64-bit
 
 ## How to build application code
 ### Preparation
-- Please download the following files from `Releases` in GitHub, and extract them to the same name directory
-	- third_party.zip
-	- resource.zip
+- Get source code
+	```sh
+	git clone https://github.com/iwatake2222/play_with_mnn.git
+	cd play_with_mnn
+	git submodule update --init
+	```
+
+- Download prebuilt libraries
+	- Download prebuilt libraries (ThirdParty.zip) from https://github.com/iwatake2222/InferenceHelper/releases/ 
+	- Extract it to `InferenceHelper/ThirdParty/`
+- Download models
+	- Download models (resource.zip) from https://github.com/iwatake2222/play_with_mnn/releases
+	- Extract it to `resource/`
+
 
 ### Linux
 ```
@@ -22,12 +39,20 @@ cd pj_mnn_cls_mobilenet_v2
 mkdir build && cd build
 cmake ..
 make
-
 ./main
 ```
 
-### Visual Studio
-If you use Visual Studio, please use cmake-gui to generate project files.
+### Option (Camera input)
+```sh
+cmake .. -DSPEED_TEST_ONLY=off
+```
+
+### Windows (Visual Studio)
+- Configure and Generate a new project using cmake-gui for Visual Studio 2017 64-bit
+	- `Where is the source code` : path-to-play_with_tflite/pj_tflite_cls_mobilenet_v2	(for example)
+	- `Where to build the binaries` : path-to-build	(any)
+- Open `main.sln`
+- Set `main` project as a startup project, then build and run!
 
 ### Android project
 If you want to run Android project, please select `ViewAndroid` directory in Android Studio.
@@ -46,7 +71,7 @@ You will need the following settings at first.
 	- In case you cannot import OpenCV module, remove `sdk` module and dependency of `app` to `sdk` in Project Structure
 
 ## How to create pre-built MNN library
-pre-built MNN library is stored in third_party/MNN_prebuilt . Please use the following commands if you want to build them by yourself.
+pre-built MNN library is stored in InferenceHelper/ThirdParty/MNN_prebuilt . Please use the following commands if you want to build them by yourself.
 
 
 ### Linux
@@ -141,19 +166,11 @@ mkdir build_64 && cd build_64 && ../build_64.sh
 	![protobuflib](00_doc/windows_tool.png) 
 - Build the project in Visual Studio
 
+# License
+- Copyright 2020 iwatake2222
+- Licensed under the Apache License, Version 2.0
+	- [LICENSE](LICENSE)
+
 # Acknowledgements
-- This project includes the work that is distributed in the Apache License 2.0.
-- This project includes MNN (https://github.com/alibaba/MNN ) as a submodule
-- The models are retrieved from the followings:
-	- mobilenet_v2_1.0_224.tflite
-		- https://www.tensorflow.org/lite/guide/hosted_models
-		- https://storage.googleapis.com/download.tensorflow.org/models/tflite_11_05_08/mobilenet_v2_1.0_224.tgz
-		- `MNNConvert.exe -f TFLITE --modelFile mobilenet_v2_1.0_224.tflite --MNNModel mobilenet_v2_1.0_224.mnn --bizCode biz`
-	- posenet-mobilenet_v1_075.pb
-		- https://github.com/czy2014hust/posenet-python
-		- https://github.com/czy2014hust/posenet-python/blob/master/models/model-mobilenet_v1_075.pb?raw=true
-		- `MNNConvert.exe -f TF --modelFile posenet-mobilenet_v1_075.pb --MNNModel posenet-mobilenet_v1_075.mnn --bizCode biz`
-	- deeplabv3_257_mv_gpu.tflite
-		- https://www.tensorflow.org/lite/models/segmentation/overview
-		- https://storage.googleapis.com/download.tensorflow.org/models/tflite/gpu/deeplabv3_257_mv_gpu.tflite
-		- `MNNConvert.exe -f TFLITE --modelFile deeplabv3_257_mv_gpu.tflite --MNNModel deeplabv3_257_mv_gpu.mnn --bizCode biz`
+- This project utilizes OSS (Open Source Software)
+	- [NOTICE.md](NOTICE.md)
