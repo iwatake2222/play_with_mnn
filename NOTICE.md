@@ -22,6 +22,14 @@ This project utilizes the following models:
 	- https://www.tensorflow.org/lite/models/segmentation/overview
 	- https://storage.googleapis.com/download.tensorflow.org/models/tflite/gpu/deeplabv3_257_mv_gpu.tflite
 	- `MNNConvert.exe -f TFLITE --modelFile deeplabv3_257_mv_gpu.tflite --MNNModel deeplabv3_257_mv_gpu.mnn --bizCode biz`
+- 017_Artistic-Style-Transfer_prediction.mnn
+	- https://github.com/PINTO0309/PINTO_model_zoo/tree/main/017_Artistic-Style-Transfer/official/download_new.sh
+	- Copyright (c) 2019 Katsuya Hyodo
+	- `MNNConvert.exe -f TFLITE --modelFile saved_model_prediction/model_float32.tflite --MNNModel  017_Artistic-Style-Transfer_prediction.mnn --bizCode biz`
+- 017_Artistic-Style-Transfer_transfer.mnn
+	- https://github.com/PINTO0309/PINTO_model_zoo/tree/main/017_Artistic-Style-Transfer/official/download_new.sh
+	- Copyright (c) 2019 Katsuya Hyodo
+	- `MNNConvert.exe -f TF --modelFile saved_model_transfer/model_float32.pb --MNNModel  017_Artistic-Style-Transfer_transfer.mnn --bizCode biz`
 
 --------------------------------------------------------------------
 Terms of the Apache License, Version 2.0:

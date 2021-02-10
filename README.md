@@ -26,7 +26,7 @@ Sample projects to use MNN (https://github.com/alibaba/MNN )
 	```
 
 - Download prebuilt libraries
-	- Download prebuilt libraries (ThirdParty.zip) from https://github.com/iwatake2222/InferenceHelper/releases/ 
+	- Download prebuilt libraries (ThirdParty.zip) from https://github.com/iwatake2222/InferenceHelper/releases/  (<- Not in this repository)
 	- Extract it to `InferenceHelper/ThirdParty/`
 - Download models
 	- Download models (resource.zip) from https://github.com/iwatake2222/play_with_mnn/releases
