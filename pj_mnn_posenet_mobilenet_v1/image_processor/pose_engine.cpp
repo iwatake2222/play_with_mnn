@@ -15,9 +15,9 @@
 #include <opencv2/opencv.hpp>
 
 /* for My modules */
-#include "CommonHelper.h"
-#include "InferenceHelper.h"
-#include "PoseEngine.h"
+#include "common_helper.h"
+#include "inference_helper.h"
+#include "pose_engine.h"
 
 /*** Macro ***/
 #define TAG "PoseEngine"
@@ -26,10 +26,14 @@
 
 /* Model parameters */
 #define MODEL_NAME   "posenet-mobilenet_v1_075.mnn"
+#define INPUT_NAME   "image"
+#define OUTPUT_NAME  "MobilenetV2/Predictions/Reshape_1"
+#define TENSORTYPE    TensorInfo::kTensorTypeFp32
+#define IS_NCHW       true
 /* better to use the same aspect as the input image */
 static const int32_t MODEL_WIDTH = 225;
 static const int32_t MODEL_HEIGHT = 225;
-
+#define INPUT_DIMS    { 1, 3, static_cast<int32_t>((float)MODEL_HEIGHT / (float)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1, static_cast<int32_t>((float)MODEL_WIDTH / (float)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1 }
 
 /*** [Start] Retrieved from demo source code in MNN (https://github.com/alibaba/MNN/blob/master/demo/exec/multiPose.cpp) ***/
 /***         modified by iwatake2222 **/
@@ -72,12 +76,11 @@ inline float clip(float value, float min, float max) {
 }
 
 static std::pair<float,float> getCoordsFromTensor(const OutputTensorInfo& dataTensor, int id, int x, int y, bool getCoord = true) {
-	// dataTensor must be [1,c,h,w]
 	auto dataPtr = (float*)dataTensor.data;
-	const int xOffset = dataTensor.tensorDims.channel / 2;
-	const int indexPlane = y * dataTensor.tensorDims.width + x;
-	const int indexY = id * dataTensor.tensorDims.width * dataTensor.tensorDims.height + indexPlane;
-	const int indexX = (id + xOffset) * dataTensor.tensorDims.width * dataTensor.tensorDims.height + indexPlane;
+	const int xOffset = dataTensor.tensor_dims[1] / 2;
+	const int indexPlane = y * dataTensor.tensor_dims[3] + x;
+	const int indexY = id * dataTensor.tensor_dims[3] * dataTensor.tensor_dims[2] + indexPlane;
+	const int indexX = (id + xOffset) * dataTensor.tensor_dims[3] * dataTensor.tensor_dims[2] + indexPlane;
 	std::pair<float,float> point;
 	if (getCoord) {
 		point = std::pair<float, float>(dataPtr[indexX], dataPtr[indexY]);
@@ -93,8 +96,8 @@ static int decodePoseImpl(float curScore, int curId, const std::pair<float,float
 	std::vector<float>& instanceKeypointScores, std::vector<std::pair<float,float>>& instanceKeypointCoords) {
 	instanceKeypointScores[curId] = curScore;
 	instanceKeypointCoords[curId] = originalOnImageCoords;
-	const int height = heatmaps.tensorDims.height;
-	const int width = heatmaps.tensorDims.width;
+	const int height = heatmaps.tensor_dims[2];
+	const int width = heatmaps.tensor_dims[3];
 	std::map<std::string, int> poseNamesID;
 	for (int i = 0; i < PoseNames.size(); ++i) {
 		poseNamesID[PoseNames[i]] = i;
@@ -155,16 +158,16 @@ static int decodePoseImpl(float curScore, int curId, const std::pair<float,float
 
 
 static int decodeMultiPose(const OutputTensorInfo& offsets, const OutputTensorInfo& displacementFwd, const OutputTensorInfo& displacementBwd, const OutputTensorInfo& heatmaps, 
-	std::vector<float>& poseScores,
-	std::vector<std::vector<float>>& poseKeypointScores,
-	std::vector<std::vector<std::pair<float,float>>>& poseKeypointCoords) {
+	std::vector<float>& pose_scores,
+	std::vector<std::vector<float>>& pose_keypoint_scores,
+	std::vector<std::vector<std::pair<float,float>>>& pose_eypoint_coords) {
 	// keypoint_id, score, coord((x,y))
 	typedef std::pair<int, std::pair<float, std::pair<float,float>>> partsType;
 	std::vector<partsType> parts;
 
-	const int channel = heatmaps.tensorDims.channel;
-	const int height = heatmaps.tensorDims.height;
-	const int width = heatmaps.tensorDims.width;
+	const int channel = heatmaps.tensor_dims[1];
+	const int height = heatmaps.tensor_dims[2];
+	const int width = heatmaps.tensor_dims[3];
 	auto maximumFilter = [&parts, width, height](const int id, const float* startPtr) {
 		for (int y = 0; y < height; ++y) {
 			for (int x = 0; x < width; ++x) {
@@ -209,10 +212,10 @@ static int decodeMultiPose(const OutputTensorInfo& offsets, const OutputTensorIn
 
 	const int squareNMSRadius = NMS_RADIUS * NMS_RADIUS;
 
-	auto withinNMSRadius = [=, &poseKeypointCoords](const std::pair<float,float>& point, const int id) {
+	auto withinNMSRadius = [=, &pose_eypoint_coords](const std::pair<float,float>& point, const int id) {
 		bool withinThisPointRadius = false;
-		for (int i = 0; i < poseKeypointCoords.size(); ++i) {
-			const auto& curPoint = poseKeypointCoords[i][id];
+		for (int i = 0; i < pose_eypoint_coords.size(); ++i) {
+			const auto& curPoint = pose_eypoint_coords[i][id];
 			const auto sum = powf((curPoint.first - point.first), 2) + powf((curPoint.second - point.second), 2);
 			if (sum <= squareNMSRadius) {
 				withinThisPointRadius = true;
@@ -227,7 +230,7 @@ static int decodeMultiPose(const OutputTensorInfo& offsets, const OutputTensorIn
 
 	auto getInstanceScore = [&]() {
 		float notOverlappedScores = 0.0f;
-		const int poseNums = (const int)poseKeypointCoords.size();
+		const int poseNums = (const int)pose_eypoint_coords.size();
 		if (poseNums == 0) {
 			for (int i = 0; i < NUM_KEYPOINTS; ++i) {
 				notOverlappedScores += instanceKeypointScores[i];
@@ -267,9 +270,9 @@ static int decodeMultiPose(const OutputTensorInfo& offsets, const OutputTensorIn
 
 		float poseScore = getInstanceScore();
 		if (poseScore > MIN_POSE_SCORE) {
-			poseScores.push_back(poseScore);
-			poseKeypointScores.push_back(instanceKeypointScores);
-			poseKeypointCoords.push_back(instanceKeypointCoords);
+			pose_scores.push_back(poseScore);
+			pose_keypoint_scores.push_back(instanceKeypointScores);
+			pose_eypoint_coords.push_back(instanceKeypointCoords);
 			poseCount++;
 		}
 	}
@@ -278,153 +281,123 @@ static int decodeMultiPose(const OutputTensorInfo& offsets, const OutputTensorIn
 	return 0;
 }
 
-
-
-
 /*** Function ***/
-int32_t PoseEngine::initialize(const std::string& workDir, const int32_t numThreads)
+int32_t PoseEngine::Initialize(const std::string& work_dir, const int32_t num_threads)
 {
 	/* Set model information */
-	std::string modelFilename = workDir + "/model/" + MODEL_NAME;
+	std::string model_filename = work_dir + "/model/" + MODEL_NAME;
 
 	/* Set input tensor info */
-	m_inputTensorList.clear();
-	InputTensorInfo inputTensorInfo;
-	inputTensorInfo.name = "image";
-	inputTensorInfo.tensorType = TensorInfo::TENSOR_TYPE_FP32;
-	inputTensorInfo.tensorDims.batch = 1;
-	inputTensorInfo.tensorDims.width = static_cast<int32_t>((float)MODEL_WIDTH / (float)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1;
-	inputTensorInfo.tensorDims.height = static_cast<int32_t>((float)MODEL_HEIGHT / (float)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1;
-	inputTensorInfo.tensorDims.channel = 3;
-	inputTensorInfo.dataType = InputTensorInfo::DATA_TYPE_IMAGE;
-	inputTensorInfo.normalize.mean[0] = 0.5f;   	/* https://github.com/alibaba/MNN/blob/master/demo/exec/multiPose.cpp#L343 */
-	inputTensorInfo.normalize.mean[1] = 0.5f;
-	inputTensorInfo.normalize.mean[2] = 0.5f;
-	inputTensorInfo.normalize.norm[0] = 0.5f;
-	inputTensorInfo.normalize.norm[1] = 0.5f;
-	inputTensorInfo.normalize.norm[2] = 0.5f;
-	m_inputTensorList.push_back(inputTensorInfo);
+	input_tensor_info_list_.clear();
+	InputTensorInfo input_tensor_info(INPUT_NAME, TENSORTYPE, IS_NCHW);
+	input_tensor_info.tensor_dims = INPUT_DIMS;
+	input_tensor_info.data_type = InputTensorInfo::kDataTypeImage;
+	input_tensor_info.normalize.mean[0] = 0.5f;   	/* https://github.com/alibaba/MNN/blob/master/demo/exec/multiPose.cpp#L343 */
+	input_tensor_info.normalize.mean[1] = 0.5f;
+	input_tensor_info.normalize.mean[2] = 0.5f;
+	input_tensor_info.normalize.norm[0] = 0.5f;
+	input_tensor_info.normalize.norm[1] = 0.5f;
+	input_tensor_info.normalize.norm[2] = 0.5f;
+	input_tensor_info_list_.push_back(input_tensor_info);
 
 	/* Set output tensor info */
-	m_outputTensorList.clear();
-	OutputTensorInfo outputTensorInfo;
-	outputTensorInfo.tensorType = TensorInfo::TENSOR_TYPE_FP32;
-	outputTensorInfo.name = OFFSET_NODE_NAME;
-	m_outputTensorList.push_back(outputTensorInfo);
-	outputTensorInfo.name = DISPLACE_FWD_NODE_NAME;
-	m_outputTensorList.push_back(outputTensorInfo);
-	outputTensorInfo.name = DISPLACE_BWD_NODE_NAME;
-	m_outputTensorList.push_back(outputTensorInfo);
-	outputTensorInfo.name = HEATMAPS;
-	m_outputTensorList.push_back(outputTensorInfo);
+	output_tensor_info_list_.clear();
+	output_tensor_info_list_.push_back(OutputTensorInfo(OFFSET_NODE_NAME, TENSORTYPE));
+	output_tensor_info_list_.push_back(OutputTensorInfo(DISPLACE_FWD_NODE_NAME, TENSORTYPE));
+	output_tensor_info_list_.push_back(OutputTensorInfo(DISPLACE_BWD_NODE_NAME, TENSORTYPE));
+	output_tensor_info_list_.push_back(OutputTensorInfo(HEATMAPS, TENSORTYPE));
 
 	/* Create and Initialize Inference Helper */
-	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::OPEN_CV));
-	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSOR_RT));
-	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::NCNN));
-	m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::MNN));
-	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE));
-	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_EDGETPU));
-	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_GPU));
-	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_XNNPACK));
+	inference_helper_.reset(InferenceHelper::Create(InferenceHelper::kMnn));
 
-	if (!m_inferenceHelper) {
-		return RET_ERR;
+	if (!inference_helper_) {
+		return kRetErr;
 	}
-	if (m_inferenceHelper->setNumThread(numThreads) != InferenceHelper::RET_OK) {
-		m_inferenceHelper.reset();
-		return RET_ERR;
+	if (inference_helper_->SetNumThreads(num_threads) != InferenceHelper::kRetOk) {
+		inference_helper_.reset();
+		return kRetErr;
 	}
-	if (m_inferenceHelper->initialize(modelFilename, m_inputTensorList, m_outputTensorList) != InferenceHelper::RET_OK) {
-		m_inferenceHelper.reset();
-		return RET_ERR;
-	}
-	
-	/* Check if input tensor info is set */
-	for (const auto& inputTensorInfo : m_inputTensorList) {
-		if ((inputTensorInfo.tensorDims.width <= 0) || (inputTensorInfo.tensorDims.height <= 0) || inputTensorInfo.tensorType == TensorInfo::TENSOR_TYPE_NONE) {
-			PRINT_E("Invalid tensor size\n");
-			m_inferenceHelper.reset();
-			return RET_ERR;
-		}
+	if (inference_helper_->Initialize(model_filename, input_tensor_info_list_, output_tensor_info_list_) != InferenceHelper::kRetOk) {
+		inference_helper_.reset();
+		return kRetErr;
 	}
 
-	return RET_OK;
+	return kRetOk;
 }
 
-int32_t PoseEngine::finalize()
+int32_t PoseEngine::Finalize()
 {
-	if (!m_inferenceHelper) {
+	if (!inference_helper_) {
 		PRINT_E("Inference helper is not created\n");
-		return RET_ERR;
+		return kRetErr;
 	}
-	m_inferenceHelper->finalize();
-	return RET_OK;
+	inference_helper_->Finalize();
+	return kRetOk;
 }
 
 
-int32_t PoseEngine::invoke(const cv::Mat& originalMat, RESULT& result)
+int32_t PoseEngine::Process(const cv::Mat& original_mat, Result& result)
 {
-	if (!m_inferenceHelper) {
+	if (!inference_helper_) {
 		PRINT_E("Inference helper is not created\n");
-		return RET_ERR;
+		return kRetErr;
 	}
 	/*** PreProcess ***/
-	const auto& tPreProcess0 = std::chrono::steady_clock::now();
-	InputTensorInfo& inputTensorInfo = m_inputTensorList[0];
+	const auto& t_pre_process0 = std::chrono::steady_clock::now();
+	InputTensorInfo& input_tensor_info = input_tensor_info_list_[0];
 	/* do resize and color conversion here because some inference engine doesn't support these operations */
-	cv::Mat imgSrc;
-	cv::resize(originalMat, imgSrc, cv::Size(inputTensorInfo.tensorDims.width, inputTensorInfo.tensorDims.height));
+	cv::Mat img_src;
+	cv::resize(original_mat, img_src, cv::Size(input_tensor_info.GetWidth(), input_tensor_info.GetHeight()));
 #ifndef CV_COLOR_IS_RGB
-	cv::cvtColor(imgSrc, imgSrc, cv::COLOR_BGR2RGB);
+	cv::cvtColor(img_src, img_src, cv::COLOR_BGR2RGB);
 #endif
-	inputTensorInfo.data = imgSrc.data;
-	inputTensorInfo.dataType = InputTensorInfo::DATA_TYPE_IMAGE;
-	inputTensorInfo.imageInfo.width = imgSrc.cols;
-	inputTensorInfo.imageInfo.height = imgSrc.rows;
-	inputTensorInfo.imageInfo.channel = imgSrc.channels();
-	inputTensorInfo.imageInfo.cropX = 0;
-	inputTensorInfo.imageInfo.cropY = 0;
-	inputTensorInfo.imageInfo.cropWidth = imgSrc.cols;
-	inputTensorInfo.imageInfo.cropHeight = imgSrc.rows;
-	inputTensorInfo.imageInfo.isBGR = false;
-	inputTensorInfo.imageInfo.swapColor = false;
-	if (m_inferenceHelper->preProcess(m_inputTensorList) != InferenceHelper::RET_OK) {
-		return RET_ERR;
+	input_tensor_info.data = img_src.data;
+	input_tensor_info.data_type = InputTensorInfo::kDataTypeImage;
+	input_tensor_info.image_info.width = img_src.cols;
+	input_tensor_info.image_info.height = img_src.rows;
+	input_tensor_info.image_info.channel = img_src.channels();
+	input_tensor_info.image_info.crop_x = 0;
+	input_tensor_info.image_info.crop_y = 0;
+	input_tensor_info.image_info.crop_width = img_src.cols;
+	input_tensor_info.image_info.crop_height = img_src.rows;
+	input_tensor_info.image_info.is_bgr = false;
+	input_tensor_info.image_info.swap_color = false;
+	if (inference_helper_->PreProcess(input_tensor_info_list_) != InferenceHelper::kRetOk) {
+		return kRetErr;
 	}
-	const auto& tPreProcess1 = std::chrono::steady_clock::now();
+	const auto& t_pre_process1 = std::chrono::steady_clock::now();
 
 	/*** Inference ***/
-	const auto& tInference0 = std::chrono::steady_clock::now();
-	if (m_inferenceHelper->invoke(m_outputTensorList) != InferenceHelper::RET_OK) {
-		return RET_ERR;
+	const auto& t_inference0 = std::chrono::steady_clock::now();
+	if (inference_helper_->Process(output_tensor_info_list_) != InferenceHelper::kRetOk) {
+		return kRetErr;
 	}
-	const auto& tInference1 = std::chrono::steady_clock::now();
+	const auto& t_inference1 = std::chrono::steady_clock::now();
 
 	/*** PostProcess ***/
-	const auto& tPostProcess0 = std::chrono::steady_clock::now();
-	std::vector<float> poseScores;
-	std::vector<std::vector<float>> poseKeypointScores;
-	std::vector<std::vector<std::pair<float,float>>> poseKeypointCoords;	// x, y
-	decodeMultiPose(m_outputTensorList[0], m_outputTensorList[1], m_outputTensorList[2], m_outputTensorList[3], poseScores, poseKeypointScores, poseKeypointCoords);
+	const auto& t_post_process0 = std::chrono::steady_clock::now();
+	std::vector<float> pose_scores;
+	std::vector<std::vector<float>> pose_keypoint_scores;
+	std::vector<std::vector<std::pair<float,float>>> pose_eypoint_coords;	// x, y
+	decodeMultiPose(output_tensor_info_list_[0], output_tensor_info_list_[1], output_tensor_info_list_[2], output_tensor_info_list_[3], pose_scores, pose_keypoint_scores, pose_eypoint_coords);
 
-	float scaleX = static_cast<float>(originalMat.cols) / inputTensorInfo.tensorDims.width;
-	float scaleY = static_cast<float>(originalMat.rows) / inputTensorInfo.tensorDims.height;
-	for (int32_t i = 0; i < poseScores.size(); ++i) {
+	float scaleX = static_cast<float>(original_mat.cols) / input_tensor_info.GetWidth();
+	float scaleY = static_cast<float>(original_mat.rows) / input_tensor_info.GetHeight();
+	for (int32_t i = 0; i < pose_scores.size(); ++i) {
 		for (int32_t id = 0; id < NUM_KEYPOINTS; ++id) {
-			poseKeypointCoords[i][id].first *= scaleX;
-			poseKeypointCoords[i][id].second *= scaleY;
+			pose_eypoint_coords[i][id].first *= scaleX;
+			pose_eypoint_coords[i][id].second *= scaleY;
 		}
 	}
-	const auto& tPostProcess1 = std::chrono::steady_clock::now();
+	const auto& t_post_process1 = std::chrono::steady_clock::now();
 
 	/* Return the results */
-	result.poseScores = poseScores;
-	result.poseKeypointScores = poseKeypointScores;
-	result.poseKeypointCoords = poseKeypointCoords;
-	result.timePreProcess = static_cast<std::chrono::duration<double>>(tPreProcess1 - tPreProcess0).count() * 1000.0;
-	result.timeInference = static_cast<std::chrono::duration<double>>(tInference1 - tInference0).count() * 1000.0;
-	result.timePostProcess = static_cast<std::chrono::duration<double>>(tPostProcess1 - tPostProcess0).count() * 1000.0;;
+	result.pose_scores = pose_scores;
+	result.pose_keypoint_scores = pose_keypoint_scores;
+	result.pose_eypoint_coords = pose_eypoint_coords;
+	result.time_pre_process = static_cast<std::chrono::duration<double>>(t_pre_process1 - t_pre_process0).count() * 1000.0;
+	result.time_inference = static_cast<std::chrono::duration<double>>(t_inference1 - t_inference0).count() * 1000.0;
+	result.time_post_process = static_cast<std::chrono::duration<double>>(t_post_process1 - t_post_process0).count() * 1000.0;;
 
-	return RET_OK;
+	return kRetOk;
 }

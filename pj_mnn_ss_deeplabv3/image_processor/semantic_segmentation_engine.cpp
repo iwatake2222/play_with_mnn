@@ -15,9 +15,9 @@
 #include <opencv2/opencv.hpp>
 
 /* for My modules */
-#include "CommonHelper.h"
-#include "InferenceHelper.h"
-#include "SemanticSegmentationEngine.h"
+#include "common_helper.h"
+#include "inference_helper.h"
+#include "semantic_segmentation_engine.h"
 
 /*** Macro ***/
 #define TAG "SemanticSegmentationEngine"
@@ -26,130 +26,110 @@
 
 /* Model parameters */
 #define MODEL_NAME   "deeplabv3_257_mv_gpu.mnn"
+#define INPUT_NAME   "sub_7"
+#define OUTPUT_NAME  "ResizeBilinear_3"
+#define TENSORTYPE    TensorInfo::kTensorTypeFp32
+#define IS_NCHW       true
+#define INPUT_DIMS    { 1, 3, 257, 257 }
 
 
 /*** Function ***/
-int32_t SemanticSegmentationEngine::initialize(const std::string& workDir, const int32_t numThreads)
+int32_t SemanticSegmentationEngine::Initialize(const std::string& work_dir, const int32_t num_threads)
 {
 	/* Set model information */
-	std::string modelFilename = workDir + "/model/" + MODEL_NAME;
+	std::string model_filename = work_dir + "/model/" + MODEL_NAME;
 
 	/* Set input tensor info */
-	m_inputTensorList.clear();
-	InputTensorInfo inputTensorInfo;
-	inputTensorInfo.name = "sub_7";
-	inputTensorInfo.tensorType = TensorInfo::TENSOR_TYPE_FP32;
-	inputTensorInfo.tensorDims.batch = 1;
-	inputTensorInfo.tensorDims.width = 257;
-	inputTensorInfo.tensorDims.height = 257;
-	inputTensorInfo.tensorDims.channel = 3;
-	inputTensorInfo.dataType = InputTensorInfo::DATA_TYPE_IMAGE;
-	inputTensorInfo.normalize.mean[0] = 0.5f;   	/* https://github.com/tensorflow/examples/blob/master/lite/examples/image_segmentation/android/lib_interpreter/src/main/java/org/tensorflow/lite/examples/imagesegmentation/tflite/ImageSegmentationModelExecutor.kt#L236 */
-	inputTensorInfo.normalize.mean[1] = 0.5f;
-	inputTensorInfo.normalize.mean[2] = 0.5f;
-	inputTensorInfo.normalize.norm[0] = 0.5f;
-	inputTensorInfo.normalize.norm[1] = 0.5f;
-	inputTensorInfo.normalize.norm[2] = 0.5f;
-	m_inputTensorList.push_back(inputTensorInfo);
+	input_tensor_info_list_.clear();
+	InputTensorInfo input_tensor_info(INPUT_NAME, TENSORTYPE, IS_NCHW);
+	input_tensor_info.tensor_dims = INPUT_DIMS;
+	input_tensor_info.data_type = InputTensorInfo::kDataTypeImage;
+	input_tensor_info.normalize.mean[0] = 0.5f;   	/* https://github.com/tensorflow/examples/blob/master/lite/examples/image_segmentation/android/lib_interpreter/src/main/java/org/tensorflow/lite/examples/imagesegmentation/tflite/ImageSegmentationModelExecutor.kt#L236 */
+	input_tensor_info.normalize.mean[1] = 0.5f;
+	input_tensor_info.normalize.mean[2] = 0.5f;
+	input_tensor_info.normalize.norm[0] = 0.5f;
+	input_tensor_info.normalize.norm[1] = 0.5f;
+	input_tensor_info.normalize.norm[2] = 0.5f;
+	input_tensor_info_list_.push_back(input_tensor_info);
 
 	/* Set output tensor info */
-	m_outputTensorList.clear();
-	OutputTensorInfo outputTensorInfo;
-	outputTensorInfo.tensorType = TensorInfo::TENSOR_TYPE_FP32;
-	outputTensorInfo.name = "ResizeBilinear_3";
-	m_outputTensorList.push_back(outputTensorInfo);
+	output_tensor_info_list_.clear();
+	output_tensor_info_list_.push_back(OutputTensorInfo(OUTPUT_NAME, TENSORTYPE));
 
 	/* Create and Initialize Inference Helper */
-	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::OPEN_CV));
-	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSOR_RT));
-	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::NCNN));
-	m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::MNN));
-	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE));
-	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_EDGETPU));
-	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_GPU));
-	//m_inferenceHelper.reset(InferenceHelper::create(InferenceHelper::TENSORFLOW_LITE_XNNPACK));
-
-	if (!m_inferenceHelper) {
-		return RET_ERR;
+	inference_helper_.reset(InferenceHelper::Create(InferenceHelper::kMnn));
+	if (!inference_helper_) {
+		return kRetErr;
 	}
-	if (m_inferenceHelper->setNumThread(numThreads) != InferenceHelper::RET_OK) {
-		m_inferenceHelper.reset();
-		return RET_ERR;
+	if (inference_helper_->SetNumThreads(num_threads) != InferenceHelper::kRetOk) {
+		inference_helper_.reset();
+		return kRetErr;
 	}
-	if (m_inferenceHelper->initialize(modelFilename, m_inputTensorList, m_outputTensorList) != InferenceHelper::RET_OK) {
-		m_inferenceHelper.reset();
-		return RET_ERR;
+	if (inference_helper_->Initialize(model_filename, input_tensor_info_list_, output_tensor_info_list_) != InferenceHelper::kRetOk) {
+		inference_helper_.reset();
+		return kRetErr;
 	}
 
-	/* Check if input tensor info is set */
-	for (const auto& inputTensorInfo : m_inputTensorList) {
-		if ((inputTensorInfo.tensorDims.width <= 0) || (inputTensorInfo.tensorDims.height <= 0) || inputTensorInfo.tensorType == TensorInfo::TENSOR_TYPE_NONE) {
-			PRINT_E("Invalid tensor size\n");
-			m_inferenceHelper.reset();
-			return RET_ERR;
-		}
-	}
-
-	return RET_OK;
+	return kRetOk;
 }
 
-int32_t SemanticSegmentationEngine::finalize()
+int32_t SemanticSegmentationEngine::Finalize()
 {
-	if (!m_inferenceHelper) {
+	if (!inference_helper_) {
 		PRINT_E("Inference helper is not created\n");
-		return RET_ERR;
+		return kRetErr;
 	}
-	m_inferenceHelper->finalize();
-	return RET_OK;
+	inference_helper_->Finalize();
+	return kRetOk;
 }
 
 
-int32_t SemanticSegmentationEngine::invoke(const cv::Mat& originalMat, RESULT& result)
+int32_t SemanticSegmentationEngine::Process(const cv::Mat& original_mat, Result& result)
 {
-	if (!m_inferenceHelper) {
+	if (!inference_helper_) {
 		PRINT_E("Inference helper is not created\n");
-		return RET_ERR;
+		return kRetErr;
 	}
 	/*** PreProcess ***/
-	const auto& tPreProcess0 = std::chrono::steady_clock::now();
-	InputTensorInfo& inputTensorInfo = m_inputTensorList[0];
+	const auto& t_pre_process0 = std::chrono::steady_clock::now();
+	InputTensorInfo& input_tensor_info = input_tensor_info_list_[0];
 	/* do resize and color conversion here because some inference engine doesn't support these operations */
-	cv::Mat imgSrc;
-	cv::resize(originalMat, imgSrc, cv::Size(inputTensorInfo.tensorDims.width, inputTensorInfo.tensorDims.height));
+	cv::Mat img_src;
+	cv::resize(original_mat, img_src, cv::Size(input_tensor_info.GetWidth(), input_tensor_info.GetHeight()));
 #ifndef CV_COLOR_IS_RGB
-	cv::cvtColor(imgSrc, imgSrc, cv::COLOR_BGR2RGB);
+	cv::cvtColor(img_src, img_src, cv::COLOR_BGR2RGB);
 #endif
-	inputTensorInfo.data = imgSrc.data;
-	inputTensorInfo.dataType = InputTensorInfo::DATA_TYPE_IMAGE;
-	inputTensorInfo.imageInfo.width = imgSrc.cols;
-	inputTensorInfo.imageInfo.height = imgSrc.rows;
-	inputTensorInfo.imageInfo.channel = imgSrc.channels();
-	inputTensorInfo.imageInfo.cropX = 0;
-	inputTensorInfo.imageInfo.cropY = 0;
-	inputTensorInfo.imageInfo.cropWidth = imgSrc.cols;
-	inputTensorInfo.imageInfo.cropHeight = imgSrc.rows;
-	inputTensorInfo.imageInfo.isBGR = false;
-	inputTensorInfo.imageInfo.swapColor = false;
-	if (m_inferenceHelper->preProcess(m_inputTensorList) != InferenceHelper::RET_OK) {
-		return RET_ERR;
+	input_tensor_info.data = img_src.data;
+	input_tensor_info.data_type = InputTensorInfo::kDataTypeImage;
+	input_tensor_info.image_info.width = img_src.cols;
+	input_tensor_info.image_info.height = img_src.rows;
+	input_tensor_info.image_info.channel = img_src.channels();
+	input_tensor_info.image_info.crop_x = 0;
+	input_tensor_info.image_info.crop_y = 0;
+	input_tensor_info.image_info.crop_width = img_src.cols;
+	input_tensor_info.image_info.crop_height = img_src.rows;
+	input_tensor_info.image_info.is_bgr = false;
+	input_tensor_info.image_info.swap_color = false;
+	if (inference_helper_->PreProcess(input_tensor_info_list_) != InferenceHelper::kRetOk) {
+		return kRetErr;
 	}
-	const auto& tPreProcess1 = std::chrono::steady_clock::now();
+	const auto& t_pre_process1 = std::chrono::steady_clock::now();
 
 	/*** Inference ***/
-	const auto& tInference0 = std::chrono::steady_clock::now();
-	if (m_inferenceHelper->invoke(m_outputTensorList) != InferenceHelper::RET_OK) {
-		return RET_ERR;
+	const auto& t_inference0 = std::chrono::steady_clock::now();
+	if (inference_helper_->Process(output_tensor_info_list_) != InferenceHelper::kRetOk) {
+		return kRetErr;
 	}
-	const auto& tInference1 = std::chrono::steady_clock::now();
+	const auto& t_inference1 = std::chrono::steady_clock::now();
 
 	/*** PostProcess ***/
-	const auto& tPostProcess0 = std::chrono::steady_clock::now();
+	const auto& t_post_process0 = std::chrono::steady_clock::now();
 	/* Create mask image */
-	int32_t outputWidth = m_outputTensorList[0].tensorDims.width;
-	int32_t outputHeight = m_outputTensorList[0].tensorDims.height;
-	int32_t outputCannel = m_outputTensorList[0].tensorDims.channel;
-	float* values = static_cast<float*>(m_outputTensorList[0].data);
-	cv::Mat maskImage = cv::Mat::zeros(outputHeight, outputWidth, CV_8UC3);
+	int32_t outputWidth = output_tensor_info_list_[0].tensor_dims[3];
+	int32_t outputHeight = output_tensor_info_list_[0].tensor_dims[2];
+	int32_t outputCannel = output_tensor_info_list_[0].tensor_dims[1];
+	float* values = static_cast<float*>(output_tensor_info_list_[0].data);
+	cv::Mat mask_image = cv::Mat::zeros(outputHeight, outputWidth, CV_8UC3);
 	for (int32_t y = 0; y < outputHeight; y++) {
 		for (int32_t x = 0; x < outputWidth; x++) {
 			int32_t maxChannel = 0;
@@ -166,19 +146,19 @@ int32_t SemanticSegmentationEngine::invoke(const cv::Mat& originalMat, RESULT& r
 			float colorRatioB = (maxChannel % 2 + 1) / 2.0f;
 			float colorRatioG = (maxChannel % 3 + 1) / 3.0f;
 			float colorRatioR = (maxChannel % 4 + 1) / 4.0f;
-			maskImage.data[(y * outputWidth + x) * 3 + 0] = (int)(255 * colorRatioB);
-			maskImage.data[(y * outputWidth + x) * 3 + 1] = (int)(255 * colorRatioG);
-			maskImage.data[(y * outputWidth + x) * 3 + 2] = (int)(255 * (1 - colorRatioR));
+			mask_image.data[(y * outputWidth + x) * 3 + 0] = (int)(255 * colorRatioB);
+			mask_image.data[(y * outputWidth + x) * 3 + 1] = (int)(255 * colorRatioG);
+			mask_image.data[(y * outputWidth + x) * 3 + 2] = (int)(255 * (1 - colorRatioR));
 
 		}
 	}
-	const auto& tPostProcess1 = std::chrono::steady_clock::now();
+	const auto& t_post_process1 = std::chrono::steady_clock::now();
 
 	/* Return the results */
-	result.maskImage = maskImage;
-	result.timePreProcess = static_cast<std::chrono::duration<double>>(tPreProcess1 - tPreProcess0).count() * 1000.0;
-	result.timeInference = static_cast<std::chrono::duration<double>>(tInference1 - tInference0).count() * 1000.0;
-	result.timePostProcess = static_cast<std::chrono::duration<double>>(tPostProcess1 - tPostProcess0).count() * 1000.0;;
+	result.mask_image = mask_image;
+	result.time_pre_process = static_cast<std::chrono::duration<double>>(t_pre_process1 - t_pre_process0).count() * 1000.0;
+	result.time_inference = static_cast<std::chrono::duration<double>>(t_inference1 - t_inference0).count() * 1000.0;
+	result.time_post_process = static_cast<std::chrono::duration<double>>(t_post_process1 - t_post_process0).count() * 1000.0;;
 
-	return RET_OK;
+	return kRetOk;
 }
