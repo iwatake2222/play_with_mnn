@@ -1,35 +1,35 @@
 This project utilizes the following OSS (Open Source Software):
 
 - MNN
-	- https://github.com/alibaba/MNN
-	- Copyright (C) 2018 Alibaba Group Holding Limited
-	- Licensed under the Apache License, Version 2.0
-	- Modification: no
-	- Pre-built binary file is generated from this project
+   - https://github.com/alibaba/MNN
+   - Copyright (C) 2018 Alibaba Group Holding Limited
+   - Licensed under the Apache License, Version 2.0
+   - Modification: no
+   - Pre-built binary file is generated from this project
 
 --------------------------------------------------------------------
 This project utilizes the following models:
 
 - mobilenet_v2_1.0_224.tflite
-	- https://www.tensorflow.org/lite/guide/hosted_models
-	- https://storage.googleapis.com/download.tensorflow.org/models/tflite_11_05_08/mobilenet_v2_1.0_224.tgz
-	- `MNNConvert.exe -f TFLITE --modelFile mobilenet_v2_1.0_224.tflite --MNNModel mobilenet_v2_1.0_224.mnn --bizCode biz`
+   - https://www.tensorflow.org/lite/guide/hosted_models
+   - https://storage.googleapis.com/download.tensorflow.org/models/tflite_11_05_08/mobilenet_v2_1.0_224.tgz
+   - `MNNConvert.exe -f TFLITE --modelFile mobilenet_v2_1.0_224.tflite --MNNModel mobilenet_v2_1.0_224.mnn --bizCode biz`
 - posenet-mobilenet_v1_075.pb
-	- https://github.com/czy2014hust/posenet-python
-	- https://github.com/czy2014hust/posenet-python/blob/master/models/model-mobilenet_v1_075.pb?raw=true
-	- `MNNConvert.exe -f TF --modelFile posenet-mobilenet_v1_075.pb --MNNModel posenet-mobilenet_v1_075.mnn --bizCode biz`
+   - https://github.com/czy2014hust/posenet-python
+   - https://github.com/czy2014hust/posenet-python/blob/master/models/model-mobilenet_v1_075.pb?raw=true
+   - `MNNConvert.exe -f TF --modelFile posenet-mobilenet_v1_075.pb --MNNModel posenet-mobilenet_v1_075.mnn --bizCode biz`
 - deeplabv3_257_mv_gpu.tflite
-	- https://www.tensorflow.org/lite/models/segmentation/overview
-	- https://storage.googleapis.com/download.tensorflow.org/models/tflite/gpu/deeplabv3_257_mv_gpu.tflite
-	- `MNNConvert.exe -f TFLITE --modelFile deeplabv3_257_mv_gpu.tflite --MNNModel deeplabv3_257_mv_gpu.mnn --bizCode biz`
+   - https://www.tensorflow.org/lite/models/segmentation/overview
+   - https://storage.googleapis.com/download.tensorflow.org/models/tflite/gpu/deeplabv3_257_mv_gpu.tflite
+   - `MNNConvert.exe -f TFLITE --modelFile deeplabv3_257_mv_gpu.tflite --MNNModel deeplabv3_257_mv_gpu.mnn --bizCode biz`
 - 017_Artistic-Style-Transfer_prediction.mnn
-	- https://github.com/PINTO0309/PINTO_model_zoo/tree/main/017_Artistic-Style-Transfer/official/download_new.sh
-	- Copyright (c) 2019 Katsuya Hyodo
-	- `MNNConvert.exe -f TFLITE --modelFile saved_model_prediction/model_float32.tflite --MNNModel  017_Artistic-Style-Transfer_prediction.mnn --bizCode biz`
+   - https://github.com/PINTO0309/PINTO_model_zoo/tree/main/017_Artistic-Style-Transfer/official/download_new.sh
+   - Copyright (c) 2019 Katsuya Hyodo
+   - `MNNConvert.exe -f TFLITE --modelFile saved_model_prediction/model_float32.tflite --MNNModel  017_Artistic-Style-Transfer_prediction.mnn --bizCode biz`
 - 017_Artistic-Style-Transfer_transfer.mnn
-	- https://github.com/PINTO0309/PINTO_model_zoo/tree/main/017_Artistic-Style-Transfer/official/download_new.sh
-	- Copyright (c) 2019 Katsuya Hyodo
-	- `MNNConvert.exe -f TF --modelFile saved_model_transfer/model_float32.pb --MNNModel  017_Artistic-Style-Transfer_transfer.mnn --bizCode biz`
+   - https://github.com/PINTO0309/PINTO_model_zoo/tree/main/017_Artistic-Style-Transfer/official/download_new.sh
+   - Copyright (c) 2019 Katsuya Hyodo
+   - `MNNConvert.exe -f TF --modelFile saved_model_transfer/model_float32.pb --MNNModel  017_Artistic-Style-Transfer_transfer.mnn --bizCode biz`
 
 --------------------------------------------------------------------
 Terms of the Apache License, Version 2.0:

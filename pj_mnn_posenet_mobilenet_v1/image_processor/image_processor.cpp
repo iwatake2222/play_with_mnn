@@ -31,83 +31,83 @@ std::unique_ptr<PoseEngine> s_engine;
 /*** Function ***/
 static cv::Scalar CreateCvColor(int32_t b, int32_t g, int32_t r) {
 #ifdef CV_COLOR_IS_RGB
-	return cv::Scalar(r, g, b);
+    return cv::Scalar(r, g, b);
 #else
-	return cv::Scalar(b, g, r);
+    return cv::Scalar(b, g, r);
 #endif
 }
 
 
 int32_t ImageProcessor::Initialize(const InputParam* input_param)
 {
-	if (s_engine) {
-		PRINT_E("Already initialized\n");
-		return -1;
-	}
+    if (s_engine) {
+        PRINT_E("Already initialized\n");
+        return -1;
+    }
 
-	s_engine.reset(new PoseEngine());
-	if (s_engine->Initialize(input_param->work_dir, input_param->num_threads) != PoseEngine::kRetOk) {
-		return -1;
-	}
-	return 0;
+    s_engine.reset(new PoseEngine());
+    if (s_engine->Initialize(input_param->work_dir, input_param->num_threads) != PoseEngine::kRetOk) {
+        return -1;
+    }
+    return 0;
 }
 
 int32_t ImageProcessor::Finalize(void)
 {
-	if (!s_engine) {
-		PRINT_E("Not initialized\n");
-		return -1;
-	}
+    if (!s_engine) {
+        PRINT_E("Not initialized\n");
+        return -1;
+    }
 
-	if (s_engine->Finalize() != PoseEngine::kRetOk) {
-		return -1;
-	}
+    if (s_engine->Finalize() != PoseEngine::kRetOk) {
+        return -1;
+    }
 
-	return 0;
+    return 0;
 }
 
 
 int32_t ImageProcessor::Command(int32_t cmd)
 {
-	if (!s_engine) {
-		PRINT_E("Not initialized\n");
-		return -1;
-	}
+    if (!s_engine) {
+        PRINT_E("Not initialized\n");
+        return -1;
+    }
 
-	switch (cmd) {
-	case 0:
-	default:
-		PRINT_E("command(%d) is not supported\n", cmd);
-		return -1;
-	}
+    switch (cmd) {
+    case 0:
+    default:
+        PRINT_E("command(%d) is not supported\n", cmd);
+        return -1;
+    }
 }
 
 
 int32_t ImageProcessor::Process(cv::Mat* mat, OutputParam* output_param)
 {
-	if (!s_engine) {
-		PRINT_E("Not initialized\n");
-		return -1;
-	}
+    if (!s_engine) {
+        PRINT_E("Not initialized\n");
+        return -1;
+    }
 
-	cv::Mat& original_mat = *mat;
-	PoseEngine::Result result;
-	if (s_engine->Process(original_mat, result) != PoseEngine::kRetOk) {
-		return -1;
-	}
+    cv::Mat& original_mat = *mat;
+    PoseEngine::Result result;
+    if (s_engine->Process(original_mat, result) != PoseEngine::kRetOk) {
+        return -1;
+    }
 
-	/* Draw the result */
-	for (const auto& body : result.pose_eypoint_coords) {
-		for (const auto& part : body) {
-			cv::circle(original_mat, cv::Point(static_cast<int32_t>(part.first), static_cast<int32_t>(part.second)), 5, cv::Scalar(0, 255, 0), -1);
-		}
-	}
+    /* Draw the result */
+    for (const auto& body : result.pose_eypoint_coords) {
+        for (const auto& part : body) {
+            cv::circle(original_mat, cv::Point(static_cast<int32_t>(part.first), static_cast<int32_t>(part.second)), 5, cv::Scalar(0, 255, 0), -1);
+        }
+    }
 
-	/* Return the results */
-	output_param->time_pre_process = result.time_pre_process;
-	output_param->time_inference = result.time_inference;
-	output_param->time_post_process = result.time_post_process;
+    /* Return the results */
+    output_param->time_pre_process = result.time_pre_process;
+    output_param->time_inference = result.time_inference;
+    output_param->time_post_process = result.time_post_process;
 
-	return 0;
+    return 0;
 }
 
