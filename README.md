@@ -16,6 +16,20 @@ Sample projects to use MNN (https://github.com/alibaba/MNN )
     - Windows (x64). Visual Studio 2017, 2019
         - Tested in Windows10 64-bit
 
+## Usage
+```
+./main [input]
+
+ - input = blank: use the default image file set in source code (main.cpp)
+    - e.g. ./main
+ - input = *.mp4, *.avi, *.webm: use video file
+    - e.g. ./main test.mp4
+ - input = *.jpg, *.png, *.bmp: use image file
+    - e.g. ./main test.jpg
+ - input = number (e.g. 0, 1, 2, ...): use camera
+    - e.g. ./main 0
+```
+
 ## How to build application code
 ### Preparation
 - Get source code

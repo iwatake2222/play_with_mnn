@@ -38,7 +38,7 @@ static cv::Scalar CreateCvColor(int32_t b, int32_t g, int32_t r) {
 }
 
 
-int32_t ImageProcessor::Initialize(const InputParam* input_param)
+int32_t ImageProcessor::Initialize(const InputParam& input_param)
 {
     if (s_engine) {
         PRINT_E("Already initialized\n");
@@ -46,7 +46,7 @@ int32_t ImageProcessor::Initialize(const InputParam* input_param)
     }
 
     s_engine.reset(new PoseEngine());
-    if (s_engine->Initialize(input_param->work_dir, input_param->num_threads) != PoseEngine::kRetOk) {
+    if (s_engine->Initialize(input_param.work_dir, input_param.num_threads) != PoseEngine::kRetOk) {
         return -1;
     }
     return 0;
@@ -83,30 +83,29 @@ int32_t ImageProcessor::Command(int32_t cmd)
 }
 
 
-int32_t ImageProcessor::Process(cv::Mat* mat, OutputParam* output_param)
+int32_t ImageProcessor::Process(cv::Mat& mat, Result& result)
 {
     if (!s_engine) {
         PRINT_E("Not initialized\n");
         return -1;
     }
 
-    cv::Mat& original_mat = *mat;
-    PoseEngine::Result result;
-    if (s_engine->Process(original_mat, result) != PoseEngine::kRetOk) {
+    PoseEngine::Result pose_result;
+    if (s_engine->Process(mat, pose_result) != PoseEngine::kRetOk) {
         return -1;
     }
 
     /* Draw the result */
-    for (const auto& body : result.pose_eypoint_coords) {
+    for (const auto& body : pose_result.pose_eypoint_coords) {
         for (const auto& part : body) {
-            cv::circle(original_mat, cv::Point(static_cast<int32_t>(part.first), static_cast<int32_t>(part.second)), 5, cv::Scalar(0, 255, 0), -1);
+            cv::circle(mat, cv::Point(static_cast<int32_t>(part.first), static_cast<int32_t>(part.second)), 5, cv::Scalar(0, 255, 0), -1);
         }
     }
 
     /* Return the results */
-    output_param->time_pre_process = result.time_pre_process;
-    output_param->time_inference = result.time_inference;
-    output_param->time_post_process = result.time_post_process;
+    result.time_pre_process = pose_result.time_pre_process;
+    result.time_inference = pose_result.time_inference;
+    result.time_post_process = pose_result.time_post_process;
 
     return 0;
 }
