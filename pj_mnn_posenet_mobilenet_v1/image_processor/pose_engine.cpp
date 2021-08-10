@@ -16,6 +16,7 @@
 
 /* for My modules */
 #include "common_helper.h"
+#include "common_helper_cv.h"
 #include "inference_helper.h"
 #include "pose_engine.h"
 
@@ -26,14 +27,15 @@
 
 /* Model parameters */
 #define MODEL_NAME   "posenet-mobilenet_v1_075.mnn"
-#define INPUT_NAME   "image"
-#define OUTPUT_NAME  "MobilenetV2/Predictions/Reshape_1"
 #define TENSORTYPE    TensorInfo::kTensorTypeFp32
-#define IS_NCHW       true
-/* better to use the same aspect as the input image */
-static const int32_t MODEL_WIDTH = 225;
-static const int32_t MODEL_HEIGHT = 225;
+#define INPUT_NAME   "image"
+static constexpr int32_t MODEL_WIDTH = 225;
+static constexpr int32_t MODEL_HEIGHT = 225;
 #define INPUT_DIMS    { 1, 3, static_cast<int32_t>((float)MODEL_HEIGHT / (float)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1, static_cast<int32_t>((float)MODEL_WIDTH / (float)OUTPUT_STRIDE) * OUTPUT_STRIDE + 1 }
+#define IS_NCHW       true
+#define IS_RGB        true
+#define OUTPUT_NAME  "MobilenetV2/Predictions/Reshape_1"
+
 
 /*** [Start] Retrieved from demo source code in MNN (https://github.com/alibaba/MNN/blob/master/demo/exec/multiPose.cpp) ***/
 /***         modified by iwatake2222 **/
@@ -346,11 +348,15 @@ int32_t PoseEngine::Process(const cv::Mat& original_mat, Result& result)
     const auto& t_pre_process0 = std::chrono::steady_clock::now();
     InputTensorInfo& input_tensor_info = input_tensor_info_list_[0];
     /* do resize and color conversion here because some inference engine doesn't support these operations */
-    cv::Mat img_src;
-    cv::resize(original_mat, img_src, cv::Size(input_tensor_info.GetWidth(), input_tensor_info.GetHeight()));
-#ifndef CV_COLOR_IS_RGB
-    cv::cvtColor(img_src, img_src, cv::COLOR_BGR2RGB);
-#endif
+    int32_t crop_x = 0;
+    int32_t crop_y = 0;
+    int32_t crop_w = original_mat.cols;
+    int32_t crop_h = original_mat.rows;
+    cv::Mat img_src = cv::Mat::zeros(input_tensor_info.GetHeight(), input_tensor_info.GetWidth(), CV_8UC3);
+    //CommonHelper::CropResizeCvt(original_mat, img_src, crop_x, crop_y, crop_w, crop_h, IS_RGB, CommonHelper::kCropTypeStretch);
+    //CommonHelper::CropResizeCvt(original_mat, img_src, crop_x, crop_y, crop_w, crop_h, IS_RGB, CommonHelper::kCropTypeCut);
+    CommonHelper::CropResizeCvt(original_mat, img_src, crop_x, crop_y, crop_w, crop_h, IS_RGB, CommonHelper::kCropTypeExpand);
+
     input_tensor_info.data = img_src.data;
     input_tensor_info.data_type = InputTensorInfo::kDataTypeImage;
     input_tensor_info.image_info.width = img_src.cols;
@@ -381,12 +387,14 @@ int32_t PoseEngine::Process(const cv::Mat& original_mat, Result& result)
     std::vector<std::vector<std::pair<float,float>>> pose_eypoint_coords;	// x, y
     decodeMultiPose(output_tensor_info_list_[0], output_tensor_info_list_[1], output_tensor_info_list_[2], output_tensor_info_list_[3], pose_scores, pose_keypoint_scores, pose_eypoint_coords);
 
-    float scaleX = static_cast<float>(original_mat.cols) / input_tensor_info.GetWidth();
-    float scaleY = static_cast<float>(original_mat.rows) / input_tensor_info.GetHeight();
+    float scaleX = static_cast<float>(crop_w) / input_tensor_info.GetWidth();
+    float scaleY = static_cast<float>(crop_h) / input_tensor_info.GetHeight();
     for (int32_t i = 0; i < pose_scores.size(); ++i) {
         for (int32_t id = 0; id < NUM_KEYPOINTS; ++id) {
             pose_eypoint_coords[i][id].first *= scaleX;
+            pose_eypoint_coords[i][id].first += crop_x;
             pose_eypoint_coords[i][id].second *= scaleY;
+            pose_eypoint_coords[i][id].second += crop_y;
         }
     }
     const auto& t_post_process1 = std::chrono::steady_clock::now();
