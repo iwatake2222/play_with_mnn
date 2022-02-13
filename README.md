@@ -70,21 +70,14 @@ make
 - Open `main.sln`
 - Set `main` project as a startup project, then build and run!
 
-### 2-c. Build in Android project
-If you want to run Android project, please open `ViewAndroid` directory in Android Studio.
-
-You will need the following settings at first.
-
-- Configure NDK
-    - File -> Project Structure -> SDK Location -> Android NDK location
-        - C:\Users\abc\AppData\Local\Android\Sdk\ndk\21.3.6528147
-- Import OpenCV
-    - Download and extract OpenCV android-sdk (https://github.com/opencv/opencv/releases )
-    - File -> New -> Import Module
-        - path-to-opencv\opencv-4.3.0-android-sdk\OpenCV-android-sdk\sdk
-    - FIle -> Project Structure -> Dependencies -> app -> Declared Dependencies -> + -> Module Dependencies
-        - select `sdk`
-    - In case you cannot import OpenCV module, remove `sdk` module and dependency of `app` to `sdk` in Project Structure
+### 2-c. Build in Android Studio
+- Please refer to
+    - https://github.com/iwatake2222/InferenceHelper_Sample#2-d-build-in-android-studio
+- Copy `resource` directory to `/storage/emulated/0/Android/data/com.iwatake.viewandroidmnn/files/Documents/resource`
+    - the directory will be created after running the app (so the first run should fail because model files cannot be read)
+- Modify `ViewAndroid\app\src\main\cpp\CMakeLists.txt` to select a image processor you want to use
+    - `set(ImageProcessor_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../../../pj_mnn_cls_mobilenet_v2/image_processor")`
+    - replace `pj_mnn_cls_mobilenet_v2` to another
 
 # License
 - Copyright 2020 iwatake2222
