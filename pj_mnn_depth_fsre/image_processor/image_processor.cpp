@@ -117,6 +117,9 @@ int32_t ImageProcessor::Process(cv::Mat& mat, ImageProcessor::Result& result)
     /* Convert to colored depth map */
     cv::Mat mat_depth;
     cv::applyColorMap(ss_result.mat_out, mat_depth, cv::COLORMAP_MAGMA);
+#if defined(ANDROID) || defined(__ANDROID__)
+    cv::cvtColor(mat_depth, mat_depth, cv::COLOR_RGB2BGR);
+#endif
     
     /* Create result image */
     double scale = static_cast<double>(mat.rows) / mat_depth.rows;
