@@ -30,6 +30,10 @@ This project utilizes the following models:
    - https://github.com/PINTO0309/PINTO_model_zoo/tree/main/017_Artistic-Style-Transfer/official/download_new.sh
    - Copyright (c) 2019 Katsuya Hyodo
    - `MNNConvert.exe -f TF --modelFile saved_model_transfer/model_float32.pb --MNNModel  017_Artistic-Style-Transfer_transfer.mnn --bizCode biz`
+- yolov7-tiny_384x640.mnn
+   - The License of the models is GPL-3.0 license
+   - https://github.com/WongKinYiu/yolov7
+   - https://github.com/PINTO0309/PINTO_model_zoo
 
 --------------------------------------------------------------------
 Terms of the Apache License, Version 2.0:
