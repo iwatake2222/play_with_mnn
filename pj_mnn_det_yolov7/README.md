@@ -2,6 +2,9 @@
 Sample project to run YOLOv7 + SORT
 
 ![00_doc/demo.jpg](00_doc/demo.jpg)
+
+https://user-images.githubusercontent.com/11009876/178091422-46d944eb-d29e-4cd8-af5f-a48a8639d6e5.mp4
+
 *yolov7-tiny_384x640 with Android (Pixel 4a)*
 
 ## How to Run
