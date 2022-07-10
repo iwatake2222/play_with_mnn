@@ -11,7 +11,7 @@ https://user-images.githubusercontent.com/11009876/178091422-46d944eb-d29e-4cd8-
 1. Please follow the instruction: https://github.com/iwatake2222/play_with_tensorrt/blob/master/README.md
 2. Additional steps:
     - Download the model using the following script
-        - https://github.com/PINTO0309/PINTO_model_zoo/blob/main/307_YOLOv7/download.sh
+        - https://github.com/PINTO0309/PINTO_model_zoo/blob/main/307_YOLOv7/download_single_batch.sh
         - Convert `yolov7-tiny_384x640.onnx` using `01_script_convert/onnx2mnn.bat`
         - Place the generated MNN model to `resource/model/yolov7-tiny_384x640.mnn`
     - Build  `pj_mnn_det_yolov7` project (this directory)
