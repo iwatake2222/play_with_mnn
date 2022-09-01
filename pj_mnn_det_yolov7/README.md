@@ -8,7 +8,7 @@ https://user-images.githubusercontent.com/11009876/178091422-46d944eb-d29e-4cd8-
 *yolov7-tiny_384x640 with Android (Pixel 4a)*
 
 ## How to Run
-1. Please follow the instruction: https://github.com/iwatake2222/play_with_tensorrt/blob/master/README.md
+1. Please follow the instruction: https://github.com/iwatake2222/play_with_mnn/blob/master/README.md
 2. Additional steps:
     - Download the model using the following script
         - https://github.com/PINTO0309/PINTO_model_zoo/blob/main/307_YOLOv7/download_single_batch.sh
